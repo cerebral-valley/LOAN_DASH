@@ -1,0 +1,5 @@
+[server]
+port = 8502             # always start on 8502
+headless = true         # true if you run it on a server / no browser
+address = "localhost"   # uncomment if you want to expose on the network
+
