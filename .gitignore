@@ -1,1 +1,11 @@
-gitignore\n# Byte-code\ n__pycache__/\n*.py[cod]\n# Env\n.env\n# OS\n.DS_Store\n
+# Byte-code
+__pycache__/
+*.py[cod]
+# Env
+.env
+.env.template
+# OS
+.DS_Store
+# VSCode
+.vscode/
+.vscode/settings.json
