@@ -10,8 +10,9 @@ Loan Dashboard for client-wise and vyapari-wise analysis using Streamlit, Plotly
 
 ## Usage
 1. Install dependencies: `pip install -r requirements.txt` or use Poetry
-2. Configure database credentials in `.env`
-3. Run the dashboard: `streamlit run main.py`
+2. Copy `.env.template` to `.env` and fill in your actual database credentials (never commit `.env`)
+3. If using VSCode, copy `.vscode/settings.json` and update with your local credentials (never commit this file)
+4. Run the dashboard: `streamlit run main.py`
 
 ## Folder Structure
 - `db.py` - Database access
