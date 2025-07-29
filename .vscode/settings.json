@@ -1,0 +1,19 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "test_connection_loan_app",
+            "database": "loan_app",
+            "username": "loan_dash_ro",
+            "password": "StrongPwd123!"
+        }
+    ],
+    "chat.agent.maxRequests": 100
+}

@@ -92,10 +92,11 @@ try:
     # These are sums/counts over the entire dataset, representing cumulative totals
     total_disbursed_amt_overall = loan_df['loan_amount'].sum()
 
-    # Total Outstanding (₹): Sum of pending_loan_amount for active loans (released == 'false')
+
+    # Total Outstanding (₹): Sum of pending_loan_amount for active loans (released == 'FALSE')
     total_outstanding_amt_overall = loan_df[
         loan_df['released'].str.upper() == 'FALSE'
-    ]['loan_amount'].sum()
+    ]['pending_loan_amount'].sum()
 
     total_disbursed_qty_overall = loan_df['loan_number'].count()
 

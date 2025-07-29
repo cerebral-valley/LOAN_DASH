@@ -292,7 +292,9 @@ try:
     
     with col3:
         total_interest = interest_df['interest_amount'].sum()
-        outstanding_amount = total_disbursed - total_released
+
+        # Outstanding Amount (₹): Sum of pending_loan_amount for active loans (released == 'FALSE')
+        outstanding_amount = loan_df[loan_df['released'].str.upper() == 'FALSE']['pending_loan_amount'].sum()
         st.metric("Total Interest Received (₹)", f"{total_interest:,.0f}")
         st.metric("Outstanding Amount (₹)", f"{outstanding_amount:,.0f}")
 

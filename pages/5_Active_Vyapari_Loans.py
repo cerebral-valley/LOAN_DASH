@@ -74,7 +74,7 @@ try:
                     st.subheader("🔴 Active Loans (Outstanding)")
                     if not active_loans.empty:
                         st.dataframe(active_loans, use_container_width=True)
-                        st.info(f"**Total Outstanding Amount: ₹{active_loans['loan_amount'].sum():,.2f}**")
+                        st.info(f"**Total Outstanding Amount: ₹{active_loans['pending_loan_amount'].sum():,.2f}**")
                     else:
                         st.success("No active loans for this customer.")
 

@@ -189,7 +189,7 @@ try:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            total_outstanding_amount = outstanding_loans['loan_amount'].sum()
+            total_outstanding_amount = outstanding_loans['pending_loan_amount'].sum()
             st.metric("Total Outstanding Amount", f"₹{total_outstanding_amount:,.0f}")
         
         with col2:

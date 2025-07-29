@@ -293,7 +293,7 @@ try:
             st.metric("Total Quantity", f"{total_private_quantity:,.0f}")
         
         with col3:
-            outstanding_private = private_loans[private_loans['released'].str.upper() == 'FALSE']['loan_amount'].sum()
+            outstanding_private = private_loans[private_loans['released'].str.upper() == 'FALSE']['pending_loan_amount'].sum()
             st.metric("Outstanding (₹)", f"{outstanding_private:,.0f}")
         
         with col4:
