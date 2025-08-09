@@ -559,7 +559,7 @@ try:
     outstanding_summary.columns = ['customer_type', 'outstanding_amount']
     
     summary_data = summary_data.merge(outstanding_summary, on='customer_type', how='left')
-    summary_data['outstanding_amount'].fillna(0, inplace=True)
+    summary_data['outstanding_amount'] = summary_data['outstanding_amount'].fillna(0)
     
     st.dataframe(
         summary_data.style

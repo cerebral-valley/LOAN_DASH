@@ -82,7 +82,7 @@ with tabs[1]:
     try:
         engine = get_engine()
         df = pd.read_sql("SELECT * FROM accounts", engine)
-        st.dataframe(df)
+        st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
 
@@ -199,7 +199,7 @@ with tabs[3]:
                 cursor.close()
         # Show all transactions for selected account
         df_tx = pd.read_sql(f"SELECT * FROM monthly_totals WHERE account_code = '{account_code}'", engine)
-        st.dataframe(df_tx)
+        st.dataframe(df_tx, use_container_width=True)
     except Exception as e:
         st.error(f"Error: {e}")
     finally:
