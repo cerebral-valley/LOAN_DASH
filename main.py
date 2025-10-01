@@ -13,5 +13,6 @@ try:
     st.page_link("pages/3_Client_Wise.py", label="Client Wise", icon="👤")
     st.page_link("pages/4_Vyapari_Wise.py", label="Vyapari Wise", icon="🧑‍💼")
     st.page_link("pages/5_Active_Vyapari_Loans.py", label="Active Vyapari Loans", icon="💼")
+    st.page_link("pages/6_Annual_Data.py", label="Annual Data", icon="👥")
 except AttributeError:
     pass

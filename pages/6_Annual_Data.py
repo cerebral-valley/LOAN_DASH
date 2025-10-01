@@ -175,7 +175,7 @@ with tabs[3]:
                 with ColD:
                     credit = st.number_input("Credit", value=0.0, key="credit_input")
             # Calculate closing balance and type using helper
-            ClosingBalanceAmount = opening_balance + (debit - credit)
+            ClosingBalanceAmount = opening_balance + (debit - credit) if opening_type == "Cr" else opening_balance + (credit - debit) if opening_type == "Dr" else 0
             closing_type = calculate_closing_type(opening_type, ClosingBalanceAmount)
             closing_type = validate_closing_type(closing_type)
             if ClosingBalanceAmount < 0:
@@ -197,9 +197,50 @@ with tabs[3]:
                 conn.commit()
                 st.success("Transaction added successfully.")
                 cursor.close()
-        # Show all transactions for selected account
-        df_tx = pd.read_sql(f"SELECT * FROM monthly_totals WHERE account_code = '{account_code}'", engine)
-        st.dataframe(df_tx)
+        # Show all transactions for all accounts in editable dataframe, with account names
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT mt.*, a.name as account_name FROM monthly_totals mt LEFT JOIN accounts a ON mt.account_code = a.account_code ORDER BY mt.year DESC, mt.month DESC"
+        )
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        import numpy as np
+        df_tx_all = pd.DataFrame(rows, columns=columns)
+        cursor.close()
+        if df_tx_all.empty:
+            st.info("No transactions found in monthly_totals.")
+        else:
+            st.subheader("All Transactions (Editable)")
+            # Move account_name column next to account_code for clarity
+            cols_order = list(df_tx_all.columns)
+            if "account_name" in cols_order:
+                cols_order.remove("account_name")
+                idx = cols_order.index("account_code") + 1
+                cols_order.insert(idx, "account_name")
+                df_tx_all = df_tx_all[cols_order]
+            edited_df = st.data_editor(df_tx_all, num_rows="dynamic", use_container_width=True, height=600)
+            if st.button("Save Changes to Transactions"):
+                # Save edited rows back to DB (ignore account_name column)
+                cursor = conn.cursor()
+                for idx, row in edited_df.iterrows():
+                    cursor.execute(
+                        "UPDATE monthly_totals SET account_code=%s, year=%s, month=%s, opening_balance=%s, opening_type=%s, debit=%s, credit=%s, closing_balance=%s, closing_type=%s WHERE id=%s",
+                        (
+                            row["account_code"],
+                            row["year"],
+                            row["month"],
+                            row["opening_balance"],
+                            row["opening_type"],
+                            row["debit"],
+                            row["credit"],
+                            row["closing_balance"],
+                            row["closing_type"],
+                            row["id"]
+                        )
+                    )
+                conn.commit()
+                st.success("Changes saved successfully!")
+                cursor.close()
     except Exception as e:
         st.error(f"Error: {e}")
     finally:
@@ -215,62 +256,93 @@ with tabs[4]:
     today = datetime.date.today()
     default_year = today.year
     default_month = today.month
-    year = st.number_input("Year", min_value=2020, max_value=2100, value=default_year, key="bulk_year")
-    month = st.number_input("Month", min_value=1, max_value=12, value=default_month, key="bulk_month")
+    # Set session state to present month/year only if not already set
+    if "bulk_year" not in st.session_state:
+        st.session_state["bulk_year"] = default_year
+    if "bulk_month" not in st.session_state:
+        st.session_state["bulk_month"] = default_month
+    # Use only key argument, widget will use session state value
+    year = st.number_input("Year", min_value=2020, max_value=2100, key="bulk_year")
+    month = st.number_input("Month", min_value=1, max_value=12, key="bulk_month")
+    # If year/month changed, update session state and rerun
+    if year != st.session_state["bulk_year"]:
+        st.session_state["bulk_year"] = year
+        st.experimental_rerun()
+    if month != st.session_state["bulk_month"]:
+        st.session_state["bulk_month"] = month
+        st.experimental_rerun()
     # Step 3: Load all account codes and their data for the selected month
     engine = get_engine()
     conn = get_connection()
     df_acc = pd.read_sql("SELECT account_code, name, head FROM accounts", engine)
     # Get all transactions for selected year/month
     df_tx = pd.read_sql(f"SELECT * FROM monthly_totals WHERE year = {year} AND month = {month}", engine)
-    # Merge accounts with transactions, fill missing with zeros
-    merged = df_acc.merge(df_tx, on="account_code", how="left", suffixes=("", "_tx"))
-    merged["opening_balance"] = merged["opening_balance"].fillna(0.0)
-    merged["opening_type"] = merged["opening_type"].fillna("Cr")
-    merged["debit"] = merged["debit"].fillna(0.0)
-    merged["credit"] = merged["credit"].fillna(0.0)
-    merged["closing_balance"] = merged["closing_balance"].fillna(0.0)
-    merged["closing_type"] = merged["closing_type"].fillna("Cr")
-    # Step 5: Display editable table
+    # For each account, get previous month's closing balance
+    def get_prev_month(year, month):
+        if month == 1:
+            return year - 1, 12
+        else:
+            return year, month - 1
+    prev_year, prev_month = get_prev_month(year, month)
+    df_prev = pd.read_sql(f"SELECT account_code, closing_balance FROM monthly_totals WHERE year = {prev_year} AND month = {prev_month}", engine)
+    prev_map = dict(zip(df_prev["account_code"], df_prev["closing_balance"]))
+    # Merge accounts with transactions, but for each account, use DB values if present, else default
     st.write("Edit transactions for all accounts below:")
-    # Prepare editable columns
-    editable_cols = ["opening_balance", "opening_type", "debit", "credit", "closing_balance", "closing_type"]
     edited_rows = []
-    for idx, row in merged.iterrows():
+    for idx, acc_row in df_acc.iterrows():
+        account_code = acc_row["account_code"]
+        name = acc_row["name"]
+        head = acc_row["head"]
+        # Find transaction for this account in selected month
+        tx_row = df_tx[df_tx["account_code"] == account_code]
+        if not tx_row.empty:
+            tx_row = tx_row.iloc[0]
+            # Use DB values
+            debit_val = float(tx_row["debit"])
+            credit_val = float(tx_row["credit"])
+            closing_balance_val = float(tx_row["closing_balance"])
+            closing_type_val = str(tx_row["closing_type"]) if str(tx_row["closing_type"]) in ["Cr", "Dr"] else "Cr"
+            opening_type_val = str(tx_row["opening_type"]) if str(tx_row["opening_type"]) in ["Cr", "Dr"] else "Cr"
+        else:
+            # Default values if no transaction
+            debit_val = 0.0
+            credit_val = 0.0
+            closing_balance_val = 0.0
+            closing_type_val = "Cr"
+            opening_type_val = "Cr"
+        # Opening balance is previous month's closing balance (or zero)
+        opening_balance = float(prev_map.get(account_code, 0.0) or 0.0)
         cols = st.columns([2,2,2,2,2,2,2])
-        account_code = row["account_code"]
-        name = row["name"]
-        head = row["head"]
         with cols[0]:
             st.markdown(f"**{account_code} - {name} ({head})**")
         with cols[1]:
-            opening_balance = st.number_input(f"OpeningBal_{account_code}", value=float(row["opening_balance"]), key=f"ob_{account_code}_{idx}")
+            st.number_input(f"OpeningBal_{account_code}", value=opening_balance, key=f"ob_{account_code}_{idx}", disabled=True)
         with cols[2]:
-            opening_type = st.selectbox(f"OpeningType_{account_code}", ["Cr", "Dr"], index=["Cr", "Dr"].index(str(row["opening_type"])), key=f"ot_{account_code}_{idx}")
+            opening_type = st.selectbox(f"OpeningType_{account_code}", ["Cr", "Dr"], index=["Cr", "Dr"].index(opening_type_val), key=f"ot_{account_code}_{idx}")
         with cols[3]:
-            debit = st.number_input(f"Debit_{account_code}", value=float(row["debit"]), key=f"db_{account_code}_{idx}")
+            debit = st.number_input(f"Debit_{account_code}", value=debit_val, key=f"db_{account_code}_{idx}")
         with cols[4]:
-            credit = st.number_input(f"Credit_{account_code}", value=float(row["credit"]), key=f"cr_{account_code}_{idx}")
+            credit = st.number_input(f"Credit_{account_code}", value=credit_val, key=f"cr_{account_code}_{idx}")
         # Calculate closing balance/type using helper
-        ClosingBalanceAmount = opening_balance + (debit - credit)
+        ClosingBalanceAmount = opening_balance + (credit - debit) if opening_type == "Cr" else opening_balance + (debit - credit) if opening_type == "Dr" else 0
         closing_type = calculate_closing_type(opening_type, ClosingBalanceAmount)
         closing_type = validate_closing_type(closing_type)
         if ClosingBalanceAmount < 0:
             ClosingBalanceAmount = abs(ClosingBalanceAmount)
         with cols[5]:
-            st.number_input(f"ClosingBal_{account_code}", value=ClosingBalanceAmount, key=f"cb_{account_code}_{idx}", disabled=True)
+            st.number_input(f"ClosingBal_{account_code}", value=closing_balance_val, key=f"cb_{account_code}_{idx}", disabled=True)
         with cols[6]:
-            st.text_input(f"ClosingType_{account_code}", value=closing_type, key=f"ct_{account_code}_{idx}", disabled=True)
+            st.text_input(f"ClosingType_{account_code}", value=closing_type_val, key=f"ct_{account_code}_{idx}", disabled=True)
         edited_rows.append({
             "account_code": account_code,
             "year": year,
             "month": month,
-            "opening_balance": opening_balance,
+            # Do not save opening_balance
             "opening_type": opening_type,
             "debit": debit,
             "credit": credit,
-            "closing_balance": ClosingBalanceAmount,
-            "closing_type": closing_type,
+            "closing_balance": closing_balance_val,
+            "closing_type": closing_type_val,
             "head": head
         })
 
@@ -305,16 +377,16 @@ with tabs[4]:
             )
             result = cursor.fetchone()
             if result:
-                # Update existing transaction
+                # Update existing transaction (do not update opening_balance)
                 cursor.execute(
-                    "UPDATE monthly_totals SET opening_balance=%s, opening_type=%s, debit=%s, credit=%s, closing_balance=%s, closing_type=%s WHERE id=%s",
-                    (row["opening_balance"], row["opening_type"], row["debit"], row["credit"], row["closing_balance"], safe_closing_type, result[0])
+                    "UPDATE monthly_totals SET opening_type=%s, debit=%s, credit=%s, closing_balance=%s, closing_type=%s WHERE id=%s",
+                    (row["opening_type"], row["debit"], row["credit"], row["closing_balance"], safe_closing_type, result[0])
                 )
             else:
-                # Insert new transaction
+                # Insert new transaction (set opening_balance to NULL or 0)
                 cursor.execute(
-                    "INSERT INTO monthly_totals (account_code, year, month, opening_balance, opening_type, debit, credit, closing_balance, closing_type) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                    (row["account_code"], row["year"], row["month"], row["opening_balance"], row["opening_type"], row["debit"], row["credit"], row["closing_balance"], safe_closing_type)
+                    "INSERT INTO monthly_totals (account_code, year, month, opening_type, debit, credit, closing_balance, closing_type) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    (row["account_code"], row["year"], row["month"], row["opening_type"], row["debit"], row["credit"], row["closing_balance"], safe_closing_type)
                 )
         conn.commit()
         st.success("All transactions saved successfully!")
