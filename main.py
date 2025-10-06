@@ -14,5 +14,7 @@ try:
     st.page_link("pages/4_Vyapari_Wise.py", label="Vyapari Wise", icon="🧑‍💼")
     st.page_link("pages/5_Active_Vyapari_Loans.py", label="Active Vyapari Loans", icon="💼")
     st.page_link("pages/6_Annual_Data.py", label="Annual Data", icon="👥")
+    st.page_link("pages/8_Granular_Analysis.py", label="Granular Analysis", icon="🔍")
+    st.page_link("pages/9_Expense_Tracker.py", label="Expense Tracker", icon="💰")
 except AttributeError:
     pass
