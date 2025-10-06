@@ -6,8 +6,9 @@ from typing import Any
 from urllib.parse import quote_plus
 
 import pandas as pd
-from sqlalchemy import create_engine, text, func, DateTime, DECIMAL, INT, VARCHAR, Date
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy import create_engine, text, func, DateTime, DECIMAL, INT, VARCHAR, Date, Column
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 from dotenv import load_dotenv
 
 
@@ -28,8 +29,7 @@ engine = create_engine(URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # ---------- Base ----------
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
 
 # ---------- Models ----------
@@ -38,37 +38,52 @@ class Base(DeclarativeBase):
 class Loan(Base):
     __tablename__ = "loan_table"
 
-    loan_number: Mapped[int] = mapped_column(INT, primary_key=True)
-    customer_type: Mapped[str] = mapped_column(VARCHAR(50))
-    customer_name: Mapped[str] = mapped_column(VARCHAR(255))
-    customer_id: Mapped[str] = mapped_column(VARCHAR(50))
-    # css_name: Mapped[str] = mapped_column(VARCHAR(255)) # Removed due to "Unknown column" error
-    item_list: Mapped[str] = mapped_column(VARCHAR(255))
-    gross_wt: Mapped[float] = mapped_column(DECIMAL(10,2))
-    net_wt: Mapped[float] = mapped_column(DECIMAL(10,2))
-    gold_rate: Mapped[float] = mapped_column(DECIMAL(10,2))
-    purity: Mapped[float] = mapped_column(DECIMAL(5,2))
-    valuation: Mapped[float] = mapped_column(DECIMAL(10,2))
-    loan_amount: Mapped[float] = mapped_column(DECIMAL(10,2))
-    ltv_given: Mapped[float] = mapped_column(DECIMAL(6,2))
-    date_of_disbursement: Mapped[date] = mapped_column(DateTime) # Use DateTime for date_of_disbursement
-    mode_of_disbursement: Mapped[str] = mapped_column(VARCHAR(100))
-    date_of_release: Mapped[date] = mapped_column(Date) # Use Date for date_of_release
-    released: Mapped[str] = mapped_column(VARCHAR(10))
-    expiry: Mapped[date] = mapped_column(Date)
-    interest_rate: Mapped[float] = mapped_column(DECIMAL(5,2))
-    interest_amount: Mapped[float] = mapped_column(DECIMAL(10,2))
-    transfer_mode: Mapped[str] = mapped_column(VARCHAR(100))
-    scheme: Mapped[str] = mapped_column(VARCHAR(100))
-    last_intr_pay: Mapped[date] = mapped_column(Date)
-    data_entry: Mapped[str] = mapped_column(VARCHAR(255))
-    pending_loan_amount: Mapped[float] = mapped_column(DECIMAL(10,2))
-    interest_deposited_till_date: Mapped[float] = mapped_column(DECIMAL(10,2))
-    last_date_of_interest_deposit: Mapped[date] = mapped_column(Date)
-    comments: Mapped[str] = mapped_column(VARCHAR(500))
-    last_partial_principal_pay: Mapped[float] = mapped_column(DECIMAL(10,2))
-    receipt_pending: Mapped[str] = mapped_column(VARCHAR(10))
-    form_printing: Mapped[str] = mapped_column(VARCHAR(10))
+    loan_number = Column(INT, primary_key=True)
+    customer_type = Column(VARCHAR(50))
+    customer_name = Column(VARCHAR(255))
+    customer_id = Column(VARCHAR(50))
+    # css_name = Column(VARCHAR(255)) # Removed due to "Unknown column" error
+    item_list = Column(VARCHAR(255))
+    gross_wt = Column(DECIMAL(10,2))
+    net_wt = Column(DECIMAL(10,2))
+    gold_rate = Column(DECIMAL(10,2))
+    purity = Column(DECIMAL(5,2))
+    valuation = Column(DECIMAL(10,2))
+    loan_amount = Column(DECIMAL(10,2))
+    ltv_given = Column(DECIMAL(6,2))
+    date_of_disbursement = Column(DateTime) # Use DateTime for date_of_disbursement
+    mode_of_disbursement = Column(VARCHAR(100))
+    date_of_release = Column(Date) # Use Date for date_of_release
+    released = Column(VARCHAR(10))
+    expiry = Column(Date)
+    interest_rate = Column(DECIMAL(5,2))
+    interest_amount = Column(DECIMAL(10,2))
+    transfer_mode = Column(VARCHAR(100))
+    scheme = Column(VARCHAR(100))
+    last_intr_pay = Column(Date)
+    data_entry = Column(VARCHAR(255))
+    pending_loan_amount = Column(DECIMAL(10,2))
+    interest_deposited_till_date = Column(DECIMAL(10,2))
+    last_date_of_interest_deposit = Column(Date)
+    comments = Column(VARCHAR(500))
+    last_partial_principal_pay = Column(DECIMAL(10,2))
+    receipt_pending = Column(VARCHAR(10))
+    form_printing = Column(VARCHAR(10))
+
+
+class ExpenseTracker(Base):
+    __tablename__ = "expense_tracker"
+
+    id = Column(INT, primary_key=True)
+    date = Column(Date)
+    item = Column(VARCHAR(255))
+    amount = Column(DECIMAL(10,2))
+    payment_mode = Column(VARCHAR(10))  # 'cash' or 'bank'
+    bank = Column(VARCHAR(255))
+    ledger = Column(VARCHAR(255))
+    invoice_no = Column(VARCHAR(255))
+    receipt = Column(VARCHAR(10))  # 'yes' or 'no'
+    user = Column(VARCHAR(255))
 
 
 # ---------- Read-only helper functions ----------
@@ -118,4 +133,31 @@ def get_all_loans() -> pd.DataFrame:
             for loan in loans
         ]
         return pd.DataFrame(loan_data)
+
+
+def get_all_expenses() -> pd.DataFrame:
+    """
+    Fetches all expense data from the 'expense_tracker' table using SQLAlchemy ORM
+    and returns it as a Pandas DataFrame.
+    """
+    with SessionLocal() as session:
+        # Query all columns from the ExpenseTracker model
+        expenses = session.query(ExpenseTracker).all()
+        # Convert list of ExpenseTracker objects to a list of dictionaries
+        expense_data = [
+            {
+                "id": expense.id,
+                "date": expense.date,
+                "item": expense.item,
+                "amount": float(expense.amount) if expense.amount is not None else 0.0,
+                "payment_mode": expense.payment_mode,
+                "bank": expense.bank or "",
+                "ledger": expense.ledger or "",
+                "invoice_no": expense.invoice_no or "",
+                "receipt": expense.receipt or "",
+                "user": expense.user or "",
+            }
+            for expense in expenses
+        ]
+        return pd.DataFrame(expense_data)
 
