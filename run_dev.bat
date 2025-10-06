@@ -1,6 +1,6 @@
 @echo off
 echo ========================================
-echo  Production Loan Dashboard Launcher
+echo  Development Loan Dashboard Launcher
 echo ========================================
 echo.
 echo Activating Poetry virtual environment...
@@ -8,7 +8,7 @@ cd /d z:\Loan_Dash
 call .venv\Scripts\activate.bat
 echo.
 echo Environment activated successfully!
-echo Starting Streamlit application...
+echo Starting Streamlit application on localhost...
 echo.
-streamlit run main.py --server.address=0.0.0.0 --server.port=8502
+streamlit run main.py
 pause
