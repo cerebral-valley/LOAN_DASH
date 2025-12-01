@@ -7,6 +7,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import db # Import the updated db.py
+import data_cache # Import shared caching module
 import utils # Import centralized utility functions
 import pandas as pd
 import numpy as np # Import numpy for inf and NaN handling
@@ -19,7 +20,7 @@ try:
     # Fetch all loan data to get customer information
     st.subheader("Step 1: Fetching All Loan Data")
     
-    loan_df = db.get_all_loans()
+    loan_df = data_cache.load_loan_data_with_cache()
     
     if loan_df.empty:
         st.warning("No loan data found. Please check your database.")

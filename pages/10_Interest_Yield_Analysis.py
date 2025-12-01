@@ -16,6 +16,7 @@ import plotly.express as px
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import db
+import data_cache
 import utils
 
 # Page configuration
@@ -45,13 +46,7 @@ with st.sidebar:
     """)
 
 
-# Data loading function with session state caching
-@st.cache_data(ttl=3600, show_spinner=False)
-def load_loan_data():
-    """Load and prepare loan data for yield analysis"""
-    return db.get_all_loans()
-
-
+# Data preparation function
 def prepare_yield_data(df):
     """
     Prepare yield analysis dataset from raw loan data
@@ -94,9 +89,9 @@ def prepare_yield_data(df):
     return released
 
 
-# Load data
+# Load data with session state caching
 with st.spinner("Loading loan data..."):
-    raw_df = load_loan_data()
+    raw_df = data_cache.load_loan_data_with_cache()
     yield_df = prepare_yield_data(raw_df)
 
 if yield_df is None or yield_df.empty:

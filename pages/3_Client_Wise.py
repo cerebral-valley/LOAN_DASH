@@ -380,7 +380,7 @@ try:
             (vyapari_loans['date_of_disbursement'] >= cutoff_date)
         ].groupby('customer_id').agg(
             outstanding_count=('loan_number', 'count'),
-            outstanding_amount=('loan_amount', lambda x: f"{int(x.sum()):,}"),
+            outstanding_amount=('loan_amount', 'sum'),
         ).reset_index()
         
         active_vyapari_qualified = active_vyapari[active_vyapari['outstanding_count'] >= 10]
