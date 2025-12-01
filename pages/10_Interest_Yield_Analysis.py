@@ -16,6 +16,7 @@ import plotly.express as px
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import db
+import utils
 
 # Page configuration
 st.set_page_config(
@@ -284,19 +285,14 @@ for bucket in amount_labels:
 amount_range_df = pd.DataFrame(amount_range_analysis)
 
 # Display the table
-st.dataframe(
-    amount_range_df.style.format({
-        'Portfolio Yield (%)': '{:.2f}',
-        'Simple Return (%)': '{:.2f}',
-        'Capital Deployed (₹M)': '{:.2f}',
-        '% of Portfolio': '{:.1f}',
-        'Loan Count': '{:,.0f}',
-        'Avg Holding (days)': '{:.0f}',
-        'Total Interest (₹M)': '{:.2f}'
-    }),
-    use_container_width=True,
-    hide_index=True
+styled_amount_range = utils.style_mixed_table(
+    amount_range_df,
+    pct_cols=['Portfolio Yield (%)', 'Simple Return (%)'],
+    currency_cols=['Capital Deployed (₹M)', 'Total Interest (₹M)'],
+    int_cols=['Loan Count', 'Avg Holding (days)'],
+    float_cols=['% of Portfolio']
 )
+st.dataframe(styled_amount_range, use_container_width=True, hide_index=True)
 
 # Visualization: Bar chart of yield by amount range
 fig = go.Figure()
@@ -651,19 +647,14 @@ if 'customer_type' in yield_df.columns:
     
     # Comparison table
     st.markdown("### Customer Type Comparison Table")
-    st.dataframe(
-        customer_df.style.format({
-            'Portfolio Yield (%)': '{:.2f}',
-            'Simple Return (%)': '{:.2f}',
-            'Capital Deployed (₹M)': '{:.2f}',
-            '% of Portfolio': '{:.1f}',
-            'Loan Count': '{:,.0f}',
-            'Avg Holding (days)': '{:.0f}',
-            'Total Interest (₹M)': '{:.2f}'
-        }),
-        use_container_width=True,
-        hide_index=True
+    styled_customer = utils.style_mixed_table(
+        customer_df,
+        pct_cols=['Portfolio Yield (%)', 'Simple Return (%)'],
+        currency_cols=['Capital Deployed (₹M)', 'Total Interest (₹M)'],
+        int_cols=['Loan Count', 'Avg Holding (days)'],
+        float_cols=['% of Portfolio']
     )
+    st.dataframe(styled_customer, use_container_width=True, hide_index=True)
     
     # Pie chart showing capital distribution
     fig_pie = go.Figure(data=[go.Pie(
