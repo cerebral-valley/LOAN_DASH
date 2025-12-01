@@ -5,6 +5,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 import pandas as pd
+import utils  # Import centralized utility functions
 import db  # Import the updated db.py from parent directory
 
 # Load necessary data
@@ -74,7 +75,7 @@ try:
                     st.subheader("🔴 Active Loans (Outstanding)")
                     if not active_loans.empty:
                         st.dataframe(active_loans, use_container_width=True)
-                        st.info(f"**Total Outstanding Amount: ₹{active_loans['pending_loan_amount'].sum():,.2f}**")
+                        st.info(f"**Total Outstanding Amount: ₹{utils.format_currency(active_loans['pending_loan_amount'].sum())}**")
                     else:
                         st.success("No active loans for this customer.")
 
@@ -84,7 +85,7 @@ try:
                     st.subheader("✅ Released Loans (Completed)")
                     if not released_loans.empty:
                         st.dataframe(released_loans, use_container_width=True)
-                        st.info(f"**Total Released Amount: ₹{released_loans['loan_amount'].sum():,.2f}**")
+                        st.info(f"**Total Released Amount: ₹{utils.format_currency(released_loans['loan_amount'].sum())}**")
                     else:
                         st.info("No completed loans for this customer.")
                         
