@@ -7,9 +7,9 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import db # Import the updated db.py
+import utils # Import centralized utility functions
 import pandas as pd
 import numpy as np # Import numpy for inf and NaN handling
-import numpy as np
 
 st.set_page_config(page_title="Vyapari-wise Analysis", layout="wide")
 
@@ -59,17 +59,10 @@ try:
     # Ensure proper data types
     vyapari_loans["loan_amount"] = pd.to_numeric(vyapari_loans["loan_amount"], errors="coerce").fillna(0)
     vyapari_loans["date_of_disbursement"] = pd.to_datetime(vyapari_loans["date_of_disbursement"])
-    vyapari_loans['year'] = vyapari_loans['date_of_disbursement'].dt.year
     
-    # Normalize released column
-    vyapari_loans['released'] = vyapari_loans['released'].apply(
-        lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
-    )
-    
-    # Normalize released column
-    vyapari_loans['released'] = vyapari_loans['released'].apply(
-        lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
-    )
+    # Normalize customer data and add date columns using utils
+    vyapari_loans = utils.normalize_customer_data(vyapari_loans)
+    vyapari_loans = utils.add_date_columns(vyapari_loans, 'date_of_disbursement')
     
     st.success(f"Found {len(vyapari_loans)} loans for Vyapari customers from {vyapari_loans['year'].min()} to {vyapari_loans['year'].max()}")
     
@@ -88,14 +81,11 @@ try:
     
     with col1:
         st.markdown("**Annual Loan Amount Disbursed (₹)**")
-        st.dataframe(
-            amount_pivot.style
-            .format("{:,.0f}")
-            .set_properties(subset=None, **{"text-align": "right"})
-            .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-            use_container_width=True,
-            height=400
+        styled_amount = utils.style_currency_table(
+            amount_pivot,
+            currency_cols=amount_pivot.columns.tolist()
         )
+        st.dataframe(styled_amount, use_container_width=True, height=400)
     
     with col2:
         st.markdown("**Loan Amount YoY Change (%)**")
@@ -122,14 +112,11 @@ try:
     
     with col1:
         st.markdown("**Annual Loan Quantity Disbursed**")
-        st.dataframe(
-            quantity_pivot.style
-            .format("{:,.0f}")
-            .set_properties(subset=None, **{"text-align": "right"})
-            .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-            use_container_width=True,
-            height=400
+        styled_quantity = utils.style_mixed_table(
+            quantity_pivot,
+            int_cols=quantity_pivot.columns.tolist()
         )
+        st.dataframe(styled_quantity, use_container_width=True, height=400)
     
     with col2:
         st.markdown("**Loan Quantity YoY Change (%)**")
@@ -163,25 +150,19 @@ try:
         
         with col1:
             st.markdown("**Outstanding Loan Amount by Year (₹)**")
-            st.dataframe(
-                outstanding_amount_pivot.style
-                .format("{:,.0f}")
-                .set_properties(subset=None, **{"text-align": "right"})
-                .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-                use_container_width=True,
-                height=400
+            styled_outstanding_amt = utils.style_currency_table(
+                outstanding_amount_pivot,
+                currency_cols=outstanding_amount_pivot.columns.tolist()
             )
+            st.dataframe(styled_outstanding_amt, use_container_width=True, height=400)
         
         with col2:
             st.markdown("**Outstanding Loan Quantity by Year**")
-            st.dataframe(
-                outstanding_quantity_pivot.style
-                .format("{:,.0f}")
-                .set_properties(subset=None, **{"text-align": "right"})
-                .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-                use_container_width=True,
-                height=400
+            styled_outstanding_qty = utils.style_mixed_table(
+                outstanding_quantity_pivot,
+                int_cols=outstanding_quantity_pivot.columns.tolist()
             )
+            st.dataframe(styled_outstanding_qty, use_container_width=True, height=400)
         
         # Summary metrics for outstanding loans
         st.markdown("### 📈 Outstanding Loans Summary")
@@ -190,19 +171,19 @@ try:
         
         with col1:
             total_outstanding_amount = outstanding_loans['pending_loan_amount'].sum()
-            st.metric("Total Outstanding Amount", f"₹{total_outstanding_amount:,.0f}")
+            st.metric("Total Outstanding Amount", f"₹{utils.format_currency(total_outstanding_amount)}")
         
         with col2:
             total_outstanding_quantity = outstanding_loans['loan_number'].count()
-            st.metric("Total Outstanding Quantity", f"{total_outstanding_quantity:,}")
+            st.metric("Total Outstanding Quantity", utils.format_currency(total_outstanding_quantity))
         
         with col3:
             customers_with_outstanding = outstanding_loans['customer_name'].nunique()
-            st.metric("Customers with Outstanding", f"{customers_with_outstanding:,}")
+            st.metric("Customers with Outstanding", utils.format_currency(customers_with_outstanding))
         
         with col4:
             avg_outstanding_per_customer = total_outstanding_amount / customers_with_outstanding if customers_with_outstanding > 0 else 0
-            st.metric("Avg Outstanding per Customer", f"₹{avg_outstanding_per_customer:,.0f}")
+            st.metric("Avg Outstanding per Customer", f"₹{utils.format_currency(avg_outstanding_per_customer)}")
             
     else:
         st.info("No outstanding loans found (all loans are released).")
@@ -215,19 +196,19 @@ try:
     
     with col1:
         total_disbursed = vyapari_loans['loan_amount'].sum()
-        st.metric("Total Disbursed Amount", f"₹{total_disbursed:,.0f}")
+        st.metric("Total Disbursed Amount", f"₹{utils.format_currency(total_disbursed)}")
     
     with col2:
         total_loans = len(vyapari_loans)
-        st.metric("Total Loans Count", f"{total_loans:,}")
+        st.metric("Total Loans Count", utils.format_currency(total_loans))
     
     with col3:
         unique_customers = vyapari_loans['customer_name'].nunique()
-        st.metric("Unique Vyapari Customers", f"{unique_customers:,}")
+        st.metric("Unique Vyapari Customers", utils.format_currency(unique_customers))
     
     with col4:
         avg_loan_amount = vyapari_loans['loan_amount'].mean()
-        st.metric("Average Loan Amount", f"₹{avg_loan_amount:,.0f}")
+        st.metric("Average Loan Amount", f"₹{utils.format_currency(avg_loan_amount)}")
     
     # ---- VISUALIZATION: TOP CUSTOMERS ----
     st.markdown("### 🏆 Top 10 Vyapari Customers by Total Amount")
@@ -299,18 +280,12 @@ try:
     
     # Display yearly summary table
     st.markdown("**Yearly Summary Table**")
-    st.dataframe(
-        yearly_summary.style
-        .format({
-            'Total Amount': '₹{:,.0f}',
-            'Total Count': '{:,.0f}',
-            'Average Amount': '₹{:,.0f}',
-            'Unique Customers': '{:,.0f}'
-        })
-        .set_properties(subset=None, **{"text-align": "right"})
-        .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-        use_container_width=True
+    styled_yearly = utils.style_mixed_table(
+        yearly_summary,
+        currency_cols=['Total Amount', 'Average Amount'],
+        int_cols=['Total Count', 'Unique Customers']
     )
+    st.dataframe(styled_yearly, use_container_width=True)
 
 except Exception as exc:
     st.error(f"An error occurred: {str(exc)}")
