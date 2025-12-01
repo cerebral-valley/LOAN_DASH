@@ -7,6 +7,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import db # Import the updated db.py
+import data_cache # Import shared caching module
 import pandas as pd
 import numpy as np
 
@@ -17,11 +18,14 @@ st.title("👥 Client-wise Analysis Dashboard")
 with st.sidebar:
     st.info("ℹ️ This dashboard shows client-wise loan analysis.\n\n"
             "**Analysis by customer type (Private vs Vyapari)**")
+    
+    # Show cache status and refresh button
+    data_cache.show_cache_status_sidebar()
 
 # ---- load loan data ----
 try:
-    # Fetch all raw loan data from the single loan_table
-    loan_df = db.get_all_loans()
+    # Fetch all raw loan data from the single loan_table (with caching!)
+    loan_df = data_cache.load_loan_data_with_cache()
 
     if loan_df.empty:
         st.warning("No loan data found in 'loan_table'. Please ensure data is present and the 'Loan' model in db.py matches your table schema.")
@@ -118,7 +122,7 @@ try:
         # Display values
         st.dataframe(
             overall_distribution.style.format({'loan_amount': '{:,.0f}'})
-            .set_properties(**{"text-align": "right"}),
+            .set_properties(subset=None, **{"text-align": "right"}),
             use_container_width=True
         )
     
@@ -148,7 +152,7 @@ try:
             # Display values
             st.dataframe(
                 outstanding_distribution.style.format({'loan_amount': '{:,.0f}'})
-                .set_properties(**{"text-align": "right"}),
+                .set_properties(subset=None, **{"text-align": "right"}),
                 use_container_width=True
             )
         else:
@@ -165,7 +169,7 @@ try:
         st.dataframe(
             year_summary.style
             .format({'Count': '{:,}', 'Total Loan Amount (₹)': '{:,.0f}'})
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True
         )
@@ -214,7 +218,7 @@ try:
                     'Disbursed Amount (₹)': '{:,.0f}',
                     'YoY Change (%)': '{:+.1f}%'
                 }, na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True,
                 height=400
@@ -233,7 +237,7 @@ try:
                     'Disbursed Quantity': '{:,.0f}',
                     'YoY Change (%)': '{:+.1f}%'
                 }, na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True,
                 height=400
@@ -350,7 +354,7 @@ try:
         quantity_pivot.index = quantity_pivot.index.map(customer_names_map)
         
         # Calculate YoY changes for quantity
-        quantity_change = quantity_pivot.pct_change(axis=1) * 100
+        quantity_change = quantity_pivot.T.pct_change().T * 100
         quantity_change.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         col1, col2 = st.columns(2)
@@ -361,7 +365,7 @@ try:
         amount_pivot.index = amount_pivot.index.map(lambda x: customer_names_map.get(x, x))
         
         # Calculate YoY changes for amount
-        amount_change = amount_pivot.pct_change(axis=1) * 100
+        amount_change = amount_pivot.T.pct_change().T * 100
         amount_change.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         
@@ -416,7 +420,7 @@ try:
                     'Outstanding Count': '{:,.0f}',
                     'Last Disbursement': lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ""
                 })
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True
             )
@@ -458,7 +462,7 @@ try:
                 'Outstanding Quantity': '{:,.0f}',
                 'Outstanding Amount (₹)': '{:,.0f}'
             })
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True
         )
@@ -569,7 +573,7 @@ try:
             'avg_loan_size': '{:,.0f}',
             'outstanding_amount': '{:,.0f}'
         })
-        .set_properties(**{"text-align": "right"})
+        .set_properties(subset=None, **{"text-align": "right"})
         .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
         use_container_width=True
     )

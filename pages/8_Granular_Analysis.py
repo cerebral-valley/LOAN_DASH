@@ -7,6 +7,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import db # Import the updated db.py
+import data_cache # Import shared caching module
 import pandas as pd
 import numpy as np
 import calendar
@@ -20,65 +21,27 @@ with st.sidebar:
     st.info("ℹ️ This dashboard provides granular loan analysis with detailed filtering.\n\n"
             "**Filter by client, type, date range, and toggle between consolidated and granular views**")
     
-    # Data refresh section
-    st.markdown("---")
-    st.markdown("### 🔄 Data Management")
-    
-    if 'data_loaded_at' in st.session_state:
-        st.success(f"✅ Data cached at: {st.session_state.data_loaded_at.strftime('%H:%M:%S')}")
-    
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        # Clear session state to force reload
-        for key in ['loan_data', 'data_loaded_at', 'data_loaded']:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
+    # Show cache status and refresh button
+    data_cache.show_cache_status_sidebar()
 
-# ---- SESSION STATE DATA LOADING (IMPLEMENTING TANSTACK QUERY PATTERN!) ----
-def load_data_with_cache():
-    """
-    Load data once and cache in session state.
-    This implements the TanStack Query pattern for Streamlit:
-    - Check if data exists in session state
-    - If not, load from database and cache
-    - If yes, use cached data (instant load!)
-    """
-    if 'data_loaded' not in st.session_state:
-        with st.spinner('🔄 Loading data for the first time... (will be cached for instant access)'):
-            # Load data from database
-            loan_df = db.get_all_loans()
-            
-            if loan_df.empty:
-                st.error("No loan data found in database.")
-                st.stop()
-            
-            # Preprocessing
-            num_cols = ["loan_amount", "interest_amount", "pending_loan_amount"]
-            for col in num_cols:
-                if col in loan_df.columns:
-                    loan_df[col] = pd.to_numeric(loan_df[col], errors="coerce").fillna(0)
-            
-            loan_df["date_of_disbursement"] = pd.to_datetime(loan_df["date_of_disbursement"], errors='coerce')
-            loan_df["date_of_release"] = pd.to_datetime(loan_df["date_of_release"], errors='coerce')
-            
-            # Normalize data
-            loan_df['customer_type'] = loan_df['customer_type'].str.title()
-            loan_df['released'] = loan_df['released'].apply(
-                lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
-            )
-            
-            # Store in session state
-            st.session_state.loan_data = loan_df
-            st.session_state.data_loaded = True
-            st.session_state.data_loaded_at = datetime.now()
-            
-            st.success("✅ Data loaded and cached successfully!")
-    
-    return st.session_state.loan_data
-
-# Load data (from cache if available!)
+# ---- Load data with caching ----
 try:
-    loan_df = load_data_with_cache()
+    loan_df = data_cache.load_loan_data_with_cache()
+    
+    # Preprocessing for this page
+    num_cols = ["loan_amount", "interest_amount", "pending_loan_amount"]
+    for col in num_cols:
+        if col in loan_df.columns:
+            loan_df[col] = pd.to_numeric(loan_df[col], errors="coerce").fillna(0)
+    
+    loan_df["date_of_disbursement"] = pd.to_datetime(loan_df["date_of_disbursement"], errors='coerce')
+    loan_df["date_of_release"] = pd.to_datetime(loan_df["date_of_release"], errors='coerce')
+    
+    # Normalize data
+    loan_df['customer_type'] = loan_df['customer_type'].str.title()
+    loan_df['released'] = loan_df['released'].apply(
+        lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
+    )
     
     # ---- FILTER SECTION ----
     st.subheader("🎯 Filter Options")
@@ -207,11 +170,11 @@ try:
         amount_pivot.loc['Total'] = amount_pivot.sum(axis=0)
         
         # Calculate YoY change
-        amount_yoy = amount_pivot.pct_change(axis=1) * 100
+        amount_yoy = amount_pivot.T.pct_change().T * 100
         amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         # Calculate MoM change (excluding Total row)
-        amount_mom = amount_pivot.iloc[:-1].pct_change(axis=0) * 100
+        amount_mom = amount_pivot.iloc[:-1].pct_change() * 100
         amount_mom.replace([np.inf, -np.inf], np.nan, inplace=True)
         # Add back empty Total row for alignment
         amount_mom.loc['Total'] = np.nan
@@ -229,11 +192,11 @@ try:
         quantity_pivot.loc['Total'] = quantity_pivot.sum(axis=0)
         
         # Calculate YoY change for quantity
-        quantity_yoy = quantity_pivot.pct_change(axis=1) * 100
+        quantity_yoy = quantity_pivot.T.pct_change().T * 100
         quantity_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         # Calculate MoM change for quantity
-        quantity_mom = quantity_pivot.iloc[:-1].pct_change(axis=0) * 100
+        quantity_mom = quantity_pivot.iloc[:-1].pct_change() * 100
         quantity_mom.replace([np.inf, -np.inf], np.nan, inplace=True)
         quantity_mom.loc['Total'] = np.nan
         
@@ -246,7 +209,7 @@ try:
             st.markdown("**Amount (₹)**")
             st.dataframe(
                 amount_pivot.style.format("{:,.0f}", na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True,
                 height=550
@@ -256,7 +219,7 @@ try:
             st.markdown("**YoY Change (%)**")
             st.dataframe(
                 amount_yoy.style.format("{:+.1f}%", na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
                 .map(lambda x: 'color: green' if isinstance(x, (int, float)) and x > 0 else ('color: red' if isinstance(x, (int, float)) and x < 0 else '')),
                 use_container_width=True,
@@ -267,7 +230,7 @@ try:
             st.markdown("**MoM Change (%)**")
             st.dataframe(
                 amount_mom.style.format("{:+.1f}%", na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
                 .map(lambda x: 'color: green' if isinstance(x, (int, float)) and x > 0 else ('color: red' if isinstance(x, (int, float)) and x < 0 else '')),
                 use_container_width=True,
@@ -285,7 +248,7 @@ try:
             st.markdown("**Quantity (Count)**")
             st.dataframe(
                 quantity_pivot.style.format("{:,.0f}", na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True,
                 height=550
@@ -295,7 +258,7 @@ try:
             st.markdown("**YoY Change (%)**")
             st.dataframe(
                 quantity_yoy.style.format("{:+.1f}%", na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
                 .map(lambda x: 'color: green' if isinstance(x, (int, float)) and x > 0 else ('color: red' if isinstance(x, (int, float)) and x < 0 else '')),
                 use_container_width=True,
@@ -306,7 +269,7 @@ try:
             st.markdown("**MoM Change (%)**")
             st.dataframe(
                 quantity_mom.style.format("{:+.1f}%", na_rep="")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
                 .map(lambda x: 'color: green' if isinstance(x, (int, float)) and x > 0 else ('color: red' if isinstance(x, (int, float)) and x < 0 else '')),
                 use_container_width=True,
@@ -393,7 +356,7 @@ try:
         st.markdown("### 💰 Daily Loan Amount")
         st.dataframe(
             daily_amount_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -402,7 +365,7 @@ try:
         st.markdown("### 🔢 Daily Loan Quantity")
         st.dataframe(
             daily_quantity_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -436,7 +399,7 @@ try:
                             'pending_loan_amount': '{:,.0f}',
                             date_col: lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ''
                         })
-                        .set_properties(**{"text-align": "right"})
+                        .set_properties(subset=None, **{"text-align": "right"})
                         .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                         use_container_width=True
                     )

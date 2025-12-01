@@ -104,29 +104,29 @@ def get_all_loans() -> pd.DataFrame:
                 "customer_name": loan.customer_name,
                 "customer_id": loan.customer_id,
                 "item_list": loan.item_list,
-                "gross_wt": float(loan.gross_wt) if loan.gross_wt is not None else 0.0,
-                "net_wt": float(loan.net_wt) if loan.net_wt is not None else 0.0,
-                "gold_rate": float(loan.gold_rate) if loan.gold_rate is not None else 0.0,
-                "purity": float(loan.purity) if loan.purity is not None else 0.0,
-                "valuation": float(loan.valuation) if loan.valuation is not None else 0.0,
-                "loan_amount": float(loan.loan_amount) if loan.loan_amount is not None else 0.0,
-                "ltv_given": float(loan.ltv_given) if loan.ltv_given is not None else 0.0,
+                "gross_wt": float(loan.gross_wt) if loan.gross_wt is not None else 0.0,  # type: ignore
+                "net_wt": float(loan.net_wt) if loan.net_wt is not None else 0.0,  # type: ignore
+                "gold_rate": float(loan.gold_rate) if loan.gold_rate is not None else 0.0,  # type: ignore
+                "purity": float(loan.purity) if loan.purity is not None else 0.0,  # type: ignore
+                "valuation": float(loan.valuation) if loan.valuation is not None else 0.0,  # type: ignore  # type: ignore
+                "loan_amount": float(loan.loan_amount) if loan.loan_amount is not None else 0.0,  # type: ignore
+                "ltv_given": float(loan.ltv_given) if loan.ltv_given is not None else 0.0,  # type: ignore
                 "date_of_disbursement": loan.date_of_disbursement,
                 "mode_of_disbursement": loan.mode_of_disbursement,
                 "date_of_release": loan.date_of_release,
                 "released": loan.released,
                 "expiry": loan.expiry,
-                "interest_rate": float(loan.interest_rate) if loan.interest_rate is not None else 0.0,
-                "interest_amount": float(loan.interest_amount) if loan.interest_amount is not None else 0.0,
+                "interest_rate": float(loan.interest_rate) if loan.interest_rate is not None else 0.0,  # type: ignore
+                "interest_amount": float(loan.interest_amount) if loan.interest_amount is not None else 0.0,  # type: ignore
                 "transfer_mode": loan.transfer_mode,
                 "scheme": loan.scheme,
                 "last_intr_pay": loan.last_intr_pay,
                 "data_entry": loan.data_entry,
-                "pending_loan_amount": float(loan.pending_loan_amount) if loan.pending_loan_amount is not None else 0.0,
-                "interest_deposited_till_date": float(loan.interest_deposited_till_date) if loan.interest_deposited_till_date is not None else 0.0,
+                "pending_loan_amount": float(loan.pending_loan_amount) if loan.pending_loan_amount is not None else 0.0,  # type: ignore
+                "interest_deposited_till_date": float(loan.interest_deposited_till_date) if loan.interest_deposited_till_date is not None else 0.0,  # type: ignore
                 "last_date_of_interest_deposit": loan.last_date_of_interest_deposit,
                 "comments": loan.comments,
-                "last_partial_principal_pay": float(loan.last_partial_principal_pay) if loan.last_partial_principal_pay is not None else 0.0,
+                "last_partial_principal_pay": float(loan.last_partial_principal_pay) if loan.last_partial_principal_pay is not None else 0.0,  # type: ignore
                 "receipt_pending": loan.receipt_pending,
                 "form_printing": loan.form_printing,
             }
@@ -149,7 +149,7 @@ def get_all_expenses() -> pd.DataFrame:
                 "id": expense.id,
                 "date": expense.date,
                 "item": expense.item,
-                "amount": float(expense.amount) if expense.amount is not None else 0.0,
+                "amount": float(expense.amount) if expense.amount is not None else 0.0,  # type: ignore
                 "payment_mode": expense.payment_mode,
                 "bank": expense.bank or "",
                 "ledger": expense.ledger or "",
@@ -160,4 +160,62 @@ def get_all_expenses() -> pd.DataFrame:
             for expense in expenses
         ]
         return pd.DataFrame(expense_data)
+
+
+def calculate_realized_interest(df):
+    """
+    Calculate realized interest using the correct formula:
+    - Primary: Use interest_deposited_till_date (actual PAID interest)
+    - Fallback: For released loans where deposited is 0/NULL, use interest_amount (charged)
+    
+    This provides a cash-basis view of interest with graceful handling of legacy data.
+    
+    Args:
+        df: DataFrame with columns: interest_deposited_till_date, interest_amount, released
+        
+    Returns:
+        pandas.Series: realized_interest for each loan
+    """
+    # Initialize with interest_deposited_till_date (actual paid)
+    realized = df['interest_deposited_till_date'].copy()
+    
+    # For released loans with missing/zero deposited interest, use interest_amount (fallback)
+    legacy_mask = (df['released'] == 'TRUE') & (
+        df['interest_deposited_till_date'].isna() | 
+        (df['interest_deposited_till_date'] <= 0)
+    )
+    
+    realized.loc[legacy_mask] = df.loc[legacy_mask, 'interest_amount']
+    
+    return realized
+
+
+def calculate_correct_ltv(df):
+    """
+    Calculate correct LTV (Loan-to-Value) ratio:
+    LTV = (loan_amount / (net_wt * gold_rate * purity)) * 100
+    
+    Where:
+        - loan_amount: Amount disbursed to customer
+        - net_wt: Net weight of gold in grams
+        - gold_rate: Gold rate per gram
+        - purity: Purity percentage (e.g., 91.60 for 22K)
+        
+    Args:
+        df: DataFrame with columns: loan_amount, net_wt, gold_rate, purity
+        
+    Returns:
+        pandas.Series: LTV percentage for each loan
+    """
+    # Calculate collateral value: net_wt * gold_rate * (purity/100)
+    collateral_value = df['net_wt'] * df['gold_rate'] * (df['purity'] / 100)
+    
+    # Calculate LTV: (loan_amount / collateral_value) * 100
+    # Handle division by zero safely
+    ltv = pd.Series(0.0, index=df.index)
+    valid_mask = collateral_value > 0
+    ltv.loc[valid_mask] = (df.loc[valid_mask, 'loan_amount'] / collateral_value[valid_mask]) * 100
+    
+    return ltv
+
 

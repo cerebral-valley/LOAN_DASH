@@ -5,7 +5,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 import plotly.express as px
-import db # Import the updated db.py
+import db
+import data_cache # Import the updated db.py
 import pandas as pd
 import calendar as calendar
 import numpy as np # Import numpy for inf and NaN handling
@@ -17,11 +18,14 @@ st.title("📊 Yearly Breakdown Dashboard")
 with st.sidebar:
     st.info("ℹ️ This dashboard shows yearly breakdown of loan metrics.\n\n"
             "**Data is organized by year (rows) and months (columns)**")
+    
+    # Show cache status and refresh button
+    data_cache.show_cache_status_sidebar()
 
 # ---- load loan data ----
 try:
-    # Fetch all raw loan data from the single loan_table
-    loan_df = db.get_all_loans()
+    # Fetch all raw loan data from the single loan_table (with caching!)
+    loan_df = data_cache.load_loan_data_with_cache()
 
     if loan_df.empty:
         st.warning("No loan data found in 'loan_table'. Please ensure data is present and the 'Loan' model in db.py matches your table schema.")
@@ -69,7 +73,7 @@ try:
     disbursed_amount_pivot.loc['Total'] = disbursed_amount_pivot.sum(axis=0)
 
     # Calculate YoY change for disbursed amount (now months as rows)
-    disbursed_amount_yoy = disbursed_amount_pivot.pct_change(axis=1) * 100
+    disbursed_amount_yoy = disbursed_amount_pivot.T.pct_change().T * 100
     disbursed_amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     col1, col2 = st.columns(2, gap="large")
@@ -78,7 +82,7 @@ try:
         st.markdown("**Disbursed Amount (₹)**")
         st.dataframe(
             disbursed_amount_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -88,7 +92,7 @@ try:
         st.markdown("**Disbursed Amount % YoY Change**")
         st.dataframe(
             disbursed_amount_yoy.style.format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -108,7 +112,7 @@ try:
     disbursed_qty_pivot.loc['Total'] = disbursed_qty_pivot.sum(axis=0)
 
     # Calculate YoY change for disbursed quantity (now months as rows)
-    disbursed_qty_yoy = disbursed_qty_pivot.pct_change(axis=1) * 100
+    disbursed_qty_yoy = disbursed_qty_pivot.T.pct_change().T * 100
     disbursed_qty_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     col1, col2 = st.columns(2, gap="large")
@@ -117,7 +121,7 @@ try:
         st.markdown("**Disbursed Quantity**")
         st.dataframe(
             disbursed_qty_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -127,7 +131,7 @@ try:
         st.markdown("**Disbursed Quantity % YoY Change**")
         st.dataframe(
             disbursed_qty_yoy.style.format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -158,7 +162,7 @@ try:
     released_amount_pivot.loc['Total'] = released_amount_pivot.sum(axis=0)
 
     # Calculate YoY change for released amount (now months as rows)
-    released_amount_yoy = released_amount_pivot.pct_change(axis=1) * 100
+    released_amount_yoy = released_amount_pivot.T.pct_change().T * 100
     released_amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     col1, col2 = st.columns(2, gap="large")
@@ -167,7 +171,7 @@ try:
         st.markdown("**Released Amount (₹)**")
         st.dataframe(
             released_amount_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -177,7 +181,7 @@ try:
         st.markdown("**Released Amount % YoY Change**")
         st.dataframe(
             released_amount_yoy.style.format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -197,7 +201,7 @@ try:
     released_qty_pivot.loc['Total'] = released_qty_pivot.sum(axis=0)
 
     # Calculate YoY change for released quantity (now months as rows)
-    released_qty_yoy = released_qty_pivot.pct_change(axis=1) * 100
+    released_qty_yoy = released_qty_pivot.T.pct_change().T * 100
     released_qty_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     col1, col2 = st.columns(2, gap="large")
@@ -206,7 +210,7 @@ try:
         st.markdown("**Released Quantity**")
         st.dataframe(
             released_qty_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -216,7 +220,7 @@ try:
         st.markdown("**Released Quantity % YoY Change**")
         st.dataframe(
             released_qty_yoy.style.format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -247,7 +251,7 @@ try:
     interest_amount_pivot.loc['Total'] = interest_amount_pivot.sum(axis=0)
 
     # Calculate YoY change for interest amount (now months as rows)
-    interest_amount_yoy = interest_amount_pivot.pct_change(axis=1) * 100
+    interest_amount_yoy = interest_amount_pivot.T.pct_change().T * 100
     interest_amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     col1, col2 = st.columns(2, gap="large")
@@ -256,7 +260,7 @@ try:
         st.markdown("**Interest Received (₹)**")
         st.dataframe(
             interest_amount_pivot.style.format("{:,.0f}", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600
@@ -266,7 +270,7 @@ try:
         st.markdown("**Interest Received % YoY Change**")
         st.dataframe(
             interest_amount_yoy.style.format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=600

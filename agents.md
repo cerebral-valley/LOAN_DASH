@@ -65,6 +65,7 @@ Loan_Dash/
 ├── poetry.lock                      # Locked dependency versions
 │
 ├── pages/                           # Streamlit multi-page app
+│   ├── 0_Executive_Dashboard.py     # ⭐ Executive dashboard with portfolio analytics
 │   ├── 1_Overview.py                # Summary metrics and KPIs
 │   ├── 2_Yearly_Breakdown.py        # Year x Month analysis
 │   ├── 3_Client_Wise.py             # Private vs Vyapari analysis
@@ -73,8 +74,11 @@ Loan_Dash/
 │   ├── 6_Annual_Data.py             # Annual summaries
 │   ├── 6_Receipt_And_Payment.py     # Financial statements
 │   ├── 7_Balance_Sheet.py           # Balance sheet view
-│   ├── 8_Granular_Analysis.py       # ⭐ NEW: Detailed filtering & analysis
-│   └── 8_Profit_And_Loss.py         # P&L statement
+│   ├── 8_Granular_Analysis.py       # Detailed filtering & analysis
+│   ├── 8_Profit_And_Loss.py         # P&L statement
+│   ├── 9_Expense_Tracker.py         # Expense management & analysis
+│   ├── 10_Interest_Yield_Analysis.py # ⭐ Comprehensive yield analysis across all dimensions
+│   └── 11_Smart_Recommendations.py  # 🧠 AI-powered recommendations & BCG Matrix
 │
 ├── db/                              # Database schema files
 │   └── schema.sql
@@ -166,7 +170,18 @@ db.get_all_loans()  # Returns all loans as pandas DataFrame
 ### 9. **7_Balance_Sheet.py**
 - Balance sheet view
 
-### 10. **8_Granular_Analysis.py** ⭐ NEW
+### 10. **0_Executive_Dashboard.py** ⭐ PRIMARY ANALYTICS
+- **Portfolio Performance Metrics** with accurate portfolio-level yield calculations
+- **Holding Period Segmentation**: Short-term (<30 days) vs Long-term (30+ days)
+- **Loan Size Analysis**: 5-bucket breakdown with portfolio yields
+- **Yearly Interest Yield**: Portfolio-level calculation by release year
+- **Monthly Interest Yield**: Last 12 months with rolling averages
+- **Customer Type Analysis**: Vyapari vs Private with comprehensive metrics
+- **⚠️ CRITICAL**: Uses portfolio-level yield formula, NOT averaged individual yields
+- **Yield Calculation**: `(Total Interest / Total Capital) × (365 / Weighted Avg Days) × 100`
+- **See**: `YIELD_FIX_SUMMARY.md` and `EXECUTIVE_DASHBOARD_REFERENCE.md` for details
+
+### 11. **8_Granular_Analysis.py** ⭐ DETAILED FILTERING
 - **Session state caching** for performance
 - Advanced filtering (Client, Type, Status, Year, Month, Date)
 - Dual view modes:
@@ -176,7 +191,7 @@ db.get_all_loans()  # Returns all loans as pandas DataFrame
 - **Status filter**: Released/Open loans
 - **Bug fixes**: Resolved pandas FutureWarnings and PyArrow conversion errors
 
-### 11. **9_Expense_Tracker.py** ⭐ NEW
+### 12. **9_Expense_Tracker.py** ⭐ EXPENSE MANAGEMENT
 - **Comprehensive expense management** with 88 expense records
 - **Session state caching** for instant performance (TanStack Query pattern)
 - **Search functionality**: By ID and Invoice Number
@@ -188,6 +203,36 @@ db.get_all_loans()  # Returns all loans as pandas DataFrame
 - **Ledger analysis**: 15+ expense categories with pie chart distribution
 - **Summary metrics**: Total amount (₹243,846.48), count, averages
 - **Top insights**: Largest expenses, payment mode distribution
+
+### 13. **10_Interest_Yield_Analysis.py** ⭐ COMPREHENSIVE YIELD ANALYSIS
+- **Dedicated yield analysis page** built from scratch with portfolio-level calculations
+- **Overall Portfolio Metrics**: 5 key metrics (yield 14.36%, simple return, totals, weighted avg days)
+- **Holding Period Segmentation**: Short-term (<30 days: 32.14%) vs Long-term (30+ days: 14.50%)
+- **Loan Amount Range Analysis**: 5 buckets with yields ranging from 13.48% to 16.58%
+- **Yearly Interest Yield Trends**: Portfolio yield by year with YoY changes
+- **Monthly Interest Yield Trends**: Last 12 months with MoM changes and rolling averages
+- **Customer Type Analysis**: Vyapari (14.91%, 152 days) vs Private (12.17%, 267 days)
+- **Data Quality Validation**: Completeness checks and sample calculation breakdowns
+- **Educational explanations**: Weighted average holding period vs segment yields
+- **⚠️ CRITICAL**: Uses portfolio-level formula: `(Total Interest / Total Capital) × (365 / Weighted Avg Days) × 100`
+- **Session state caching** for performance optimization (`@st.cache_data(ttl=3600)`)
+- **See**: `INTEREST_YIELD_ANALYSIS_PAGE_SUMMARY.md` for complete documentation
+
+### 14. **11_Smart_Recommendations.py** 🧠 AI-POWERED RECOMMENDATIONS
+- **Automated consultation tool** that analyzes portfolio and generates dynamic recommendations
+- **5 Loan Quality Recommendations**: LTV optimization, concentration risk, retention, loan size, growth
+- **5 Interest Yield Recommendations**: Pricing, collection, tenure, segment pricing, seasonal strategies
+- **Conditional logic for 30+ scenarios**: Adapts based on current metrics (high/medium/low priority)
+- **Priority-based system**: 🔴 High (critical), 🟡 Medium (improve), 🟢 Low (maintain)
+- **Quantified impact**: Shows expected revenue/risk reduction (e.g., "Add ₹2.5M annually")
+- **Action-oriented guidance**: 5-7 specific steps for each recommendation
+- **BCG Matrix visualization**: 3D bubble chart showing portfolio evolution 2020-2025
+  - X-axis: Interest Yield (%), Y-axis: Loan Book (₹M), Bubble Size: Avg Repayment Days
+  - Quadrants: ⭐ Stars, 💰 Cash Cows, ❓ Question Marks, 🐕 Dogs
+- **Dynamic analysis**: Recommendations change as portfolio metrics evolve
+- **CSV export**: Download all recommendations for offline review
+- **Session state caching** for instant performance
+- **See**: `SMART_RECOMMENDATIONS_SUMMARY.md` and `SMART_RECOMMENDATIONS_QUICKSTART.md`
 
 ---
 
@@ -690,6 +735,71 @@ def show_performance_metrics():
 - **With optimization**: 2-3 second initial loads
 - **Memory usage**: 50-70% reduction with smart caching
 - **User experience**: Near-instant navigation between pages
+
+---
+
+## 📊 Yield Calculation Methodology (CRITICAL)
+
+### ⚠️ December 2025 Update: Portfolio-Level Yield Implementation
+
+**Background**: Previous implementation used averaged individual annualized yields, producing **inflated results** (18-20% yields). This has been corrected to portfolio-level calculations.
+
+### Correct Formula (Portfolio-Level)
+
+```python
+# Portfolio Yield = (Total Interest / Total Capital) × (365 / Weighted Avg Days) × 100
+
+portfolio_yield = (total_interest / total_capital) * (365 / weighted_avg_days) * 100
+
+# Where weighted average days is:
+weighted_avg_days = sum(loan_amount × days_to_release) / sum(loan_amount)
+```
+
+### Why NOT to Average Individual Yields
+
+❌ **INCORRECT METHOD** (produces inflated results):
+```python
+# DO NOT USE THIS
+avg_yield = released.groupby('year').agg({'interest_yield': 'mean'})
+```
+
+**Problem**: A 7-day loan with 400% yield contributes equally to the average as a 365-day loan with 12% yield, distorting results.
+
+✅ **CORRECT METHOD** (portfolio-level):
+```python
+# USE THIS PATTERN
+for period in periods:
+    period_data = released[released['period'] == period]
+    total_interest = period_data['realized_interest'].sum()
+    total_capital = period_data['loan_amount'].sum()
+    weighted_avg_days = (period_data['loan_amount'] * period_data['days_to_release']).sum() / total_capital
+    portfolio_yield = (total_interest / total_capital) * (365 / weighted_avg_days) * 100
+```
+
+### Key Metrics Reference
+
+- **True Portfolio Yield**: **14.36%** (not 18.15%)
+- **Short-term (<30 days)**: ~32% yield, 23% of capital
+- **Long-term (30+ days)**: ~14.5% yield, 77% of capital
+- **Vyapari**: 14.91% yield (152 days avg)
+- **Private**: 12.17% yield (267 days avg)
+
+### Documentation
+
+For complete details, see:
+- `YIELD_FIX_SUMMARY.md` - Comprehensive fix documentation
+- `EXECUTIVE_DASHBOARD_REFERENCE.md` - Quick reference guide
+- `test_yield_fixes.py` - Validation script
+
+### Implementation Status
+
+✅ **FIXED** in `pages/0_Executive_Dashboard.py`:
+- Portfolio Performance Metrics (lines 758-803)
+- Holding Period Segmentation (lines 807-851)
+- Loan Size Analysis (lines 1124-1204)
+- Yearly Interest Yield (lines 853-882)
+- Monthly Interest Yield (lines 970-1000)
+- Yield by Customer Type (lines 1082-1115)
 
 ---
 

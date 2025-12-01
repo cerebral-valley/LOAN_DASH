@@ -91,7 +91,7 @@ try:
         st.dataframe(
             amount_pivot.style
             .format("{:,.0f}")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=400
@@ -99,13 +99,13 @@ try:
     
     with col2:
         st.markdown("**Loan Amount YoY Change (%)**")
-        amount_yoy = amount_pivot.pct_change(axis=1) * 100
+        amount_yoy = amount_pivot.T.pct_change().T * 100
         amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         st.dataframe(
             amount_yoy.style
             .format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
             .apply(lambda x: ['background-color: lightgreen' if v > 0 else 'background-color: lightcoral' if v < 0 else '' for v in x], axis=0),
             use_container_width=True,
@@ -125,7 +125,7 @@ try:
         st.dataframe(
             quantity_pivot.style
             .format("{:,.0f}")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
             use_container_width=True,
             height=400
@@ -133,13 +133,13 @@ try:
     
     with col2:
         st.markdown("**Loan Quantity YoY Change (%)**")
-        quantity_yoy = quantity_pivot.pct_change(axis=1) * 100
+        quantity_yoy = quantity_pivot.T.pct_change().T * 100
         quantity_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
         
         st.dataframe(
             quantity_yoy.style
             .format("{:+.1f}%", na_rep="")
-            .set_properties(**{"text-align": "right"})
+            .set_properties(subset=None, **{"text-align": "right"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
             .apply(lambda x: ['background-color: lightgreen' if v > 0 else 'background-color: lightcoral' if v < 0 else '' for v in x], axis=0),
             use_container_width=True,
@@ -166,7 +166,7 @@ try:
             st.dataframe(
                 outstanding_amount_pivot.style
                 .format("{:,.0f}")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True,
                 height=400
@@ -177,7 +177,7 @@ try:
             st.dataframe(
                 outstanding_quantity_pivot.style
                 .format("{:,.0f}")
-                .set_properties(**{"text-align": "right"})
+                .set_properties(subset=None, **{"text-align": "right"})
                 .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
                 use_container_width=True,
                 height=400
@@ -307,7 +307,7 @@ try:
             'Average Amount': '₹{:,.0f}',
             'Unique Customers': '{:,.0f}'
         })
-        .set_properties(**{"text-align": "right"})
+        .set_properties(subset=None, **{"text-align": "right"})
         .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
         use_container_width=True
     )

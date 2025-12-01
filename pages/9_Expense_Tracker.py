@@ -4,6 +4,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 import streamlit as st
 import db
+import data_cache # Import shared caching module
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -19,57 +20,19 @@ with st.sidebar:
     st.info("ℹ️ This dashboard provides comprehensive expense tracking and analysis.\n\n"
             "**Filter by ledger, user, payment mode, date range, and search by ID or invoice number**")
     
-    # Data refresh section
-    st.markdown("---")
-    st.markdown("### 🔄 Data Management")
-    
-    if 'expense_data_loaded_at' in st.session_state:
-        st.success(f"✅ Data cached at: {st.session_state.expense_data_loaded_at.strftime('%H:%M:%S')}")
-    
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        # Clear session state to force reload
-        for key in ['expense_data', 'expense_data_loaded_at', 'expense_data_loaded']:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.rerun()
+    # Show cache status and refresh button
+    data_cache.show_cache_status_sidebar()
 
-# ---- SESSION STATE DATA LOADING (IMPLEMENTING TANSTACK QUERY PATTERN!) ----
-def load_expense_data_with_cache():
-    """
-    Load expense data once and cache in session state.
-    This implements the TanStack Query pattern for Streamlit:
-    - Check if data exists in session state
-    - If not, load from database and cache
-    - If yes, use cached data (instant load!)
-    """
-    if 'expense_data_loaded' not in st.session_state:
-        with st.spinner('🔄 Loading expense data for the first time... (will be cached for instant access)'):
-            # Load data from database
-            expense_df = db.get_all_expenses()
-            
-            if expense_df.empty:
-                st.error("❌ No expense data found in the database!")
-                st.stop()
-            
-            # Preprocessing
-            expense_df["date"] = pd.to_datetime(expense_df["date"], errors='coerce')
-            
-            # Normalize data
-            expense_df['payment_mode'] = expense_df['payment_mode'].str.title()
-            expense_df['receipt'] = expense_df['receipt'].str.title()
-            
-            # Store in session state
-            st.session_state.expense_data = expense_df
-            st.session_state.expense_data_loaded = True
-            st.session_state.expense_data_loaded_at = datetime.now()
-            
-            st.success("✅ Expense data loaded and cached successfully!")
-    
-    return st.session_state.expense_data
-
-# Load data (from cache if available!)
+# ---- Load expense data with caching ----
 try:
-    expense_df = load_expense_data_with_cache()
+    expense_df = data_cache.load_expense_data_with_cache()
+    
+    # Preprocessing for this page
+    expense_df["date"] = pd.to_datetime(expense_df["date"], errors='coerce')
+    
+    # Normalize data
+    expense_df['payment_mode'] = expense_df['payment_mode'].str.title()
+    expense_df['receipt'] = expense_df['receipt'].str.title()
     
     # ---- SEARCH SECTION ----
     st.subheader("🔍 Search & Filter Options")

@@ -6,6 +6,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import streamlit as st
 import plotly.express as px
 import db # Import the updated db.py
+import data_cache # Import shared caching module
 import pandas as pd
 import calendar as calendar
 import numpy as np # Import numpy for inf and NaN handling
@@ -23,11 +24,14 @@ with st.sidebar:
     st.info("ℹ️ KPI refresh is now handled directly in MySQL.\n\n"
             "Run stored procedures manually to update metrics.\n\n"
             "**This dashboard shows the latest data available in the database.**")
+    
+    # Show cache status and refresh button
+    data_cache.show_cache_status_sidebar()
 
 # ---- load loan data and compute KPIs ----
 try:
-    # Fetch all raw loan data from the single loan_table
-    loan_df = db.get_all_loans()
+    # Fetch all raw loan data from the single loan_table (with caching!)
+    loan_df = data_cache.load_loan_data_with_cache()
 
     if loan_df.empty:
         st.warning("No loan data found in 'loan_table'. Please ensure data is present and the 'Loan' model in db.py matches your table schema.")
