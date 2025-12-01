@@ -5,6 +5,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import streamlit as st
 import db
 import data_cache # Import shared caching module
+import utils
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -187,57 +188,22 @@ try:
         st.subheader("📊 Consolidated Monthly Analysis")
         
         # Create pivot tables for Amount by Month
-        amount_pivot = filtered_df.pivot_table(
-            index='month_name',
-            columns='year',
-            values='amount',
-            aggfunc='sum',
-            fill_value=0
-        )
-        
-        # Reorder months
-        month_order = [calendar.month_abbr[i] for i in range(1, 13)]
-        amount_pivot = amount_pivot.reindex(index=month_order, fill_value=0)
-        
-        # Add Total row
-        amount_pivot.loc['Total'] = amount_pivot.sum(axis=0)
+        amount_pivot = utils.create_monthly_pivot(filtered_df, 'amount', date_col='date', agg_func='sum')
         
         # Calculate YoY change (year-over-year across columns)
-        amount_yoy = (amount_pivot / amount_pivot.shift(1, axis=1) - 1) * 100
-        amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
+        amount_yoy = utils.calculate_yoy_change(amount_pivot)
         
         # Calculate MoM change (month-over-month across rows, excluding Total row)
-        amount_mom_data = (amount_pivot.iloc[:-1] / amount_pivot.iloc[:-1].shift(1, axis=0) - 1) * 100
-        amount_mom_data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        # Add back empty Total row for alignment  
-        amount_mom = pd.concat([amount_mom_data, pd.DataFrame(index=['Total'], columns=amount_pivot.columns).fillna(np.nan)])
-        amount_mom.replace([np.inf, -np.inf], np.nan, inplace=True)
-        # Add back empty Total row for alignment
-        amount_mom.loc['Total'] = np.nan
+        amount_mom = utils.calculate_mom_change(amount_pivot)
         
         # Create pivot tables for Quantity
-        quantity_pivot = filtered_df.pivot_table(
-            index='month_name',
-            columns='year',
-            values='id',
-            aggfunc='count',
-            fill_value=0
-        )
-        
-        quantity_pivot = quantity_pivot.reindex(index=month_order, fill_value=0)
-        quantity_pivot.loc['Total'] = quantity_pivot.sum(axis=0)
+        quantity_pivot = utils.create_monthly_pivot(filtered_df, 'id', date_col='date', agg_func='count')
         
         # Calculate YoY change for quantity (year-over-year across columns)
-        quantity_yoy = (quantity_pivot / quantity_pivot.shift(1, axis=1) - 1) * 100
-        quantity_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
+        quantity_yoy = utils.calculate_yoy_change(quantity_pivot)
         
         # Calculate MoM change for quantity (month-over-month across rows, excluding Total row)
-        quantity_mom_data = (quantity_pivot.iloc[:-1] / quantity_pivot.iloc[:-1].shift(1, axis=0) - 1) * 100
-        quantity_mom_data.replace([np.inf, -np.inf], np.nan, inplace=True)
-        # Add back empty Total row for alignment
-        quantity_mom = pd.concat([quantity_mom_data, pd.DataFrame(index=['Total'], columns=quantity_pivot.columns).fillna(np.nan)])
-        quantity_mom.replace([np.inf, -np.inf], np.nan, inplace=True)
-        quantity_mom.loc['Total'] = np.nan
+        quantity_mom = utils.calculate_mom_change(quantity_pivot)
         
         # Display Amount tables
         st.markdown("### 💰 Expense Amount Analysis")
@@ -246,13 +212,8 @@ try:
         
         with col1:
             st.markdown("**Amount (₹)**")
-            st.dataframe(
-                amount_pivot.style.format("₹{:,.2f}", na_rep="")
-                .set_properties(subset=None, **{"text-align": "right"})
-                .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-                use_container_width=True,
-                height=550
-            )
+            styled_amount = utils.style_currency_table(amount_pivot, currency_cols=amount_pivot.columns.tolist())
+            st.dataframe(styled_amount, use_container_width=True, height=550)
         
         with col2:
             st.markdown("**YoY Change (%)**")
@@ -284,14 +245,9 @@ try:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("**Count**")
-            st.dataframe(
-                quantity_pivot.style.format("{:,.0f}", na_rep="")
-                .set_properties(subset=None, **{"text-align": "right"})
-                .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-                use_container_width=True,
-                height=550
-            )
+            st.markdown("**Quantity (Count)**")
+            styled_quantity = utils.style_mixed_table(quantity_pivot, int_cols=quantity_pivot.columns.tolist())
+            st.dataframe(styled_quantity, use_container_width=True, height=550)
         
         with col2:
             st.markdown("**YoY Change (%)**")
@@ -375,15 +331,12 @@ try:
         
         with col1:
             st.markdown("**Ledger Summary**")
-            st.dataframe(
-                ledger_summary.style.format({
-                    'Total Amount': '₹{:,.2f}',
-                    'Count': '{:,.0f}',
-                    'Average Amount': '₹{:,.2f}',
-                    'Unique Records': '{:,.0f}'
-                }),
-                use_container_width=True
+            styled_ledger = utils.style_mixed_table(
+                ledger_summary,
+                currency_cols=['Total Amount', 'Average Amount'],
+                int_cols=['Count', 'Unique Records']
             )
+            st.dataframe(styled_ledger, use_container_width=True)
         
         with col2:
             # Pie chart for ledger distribution
@@ -514,13 +467,12 @@ try:
         st.markdown("**💳 Payment Mode Distribution**")
         payment_mode_summary = filtered_df.groupby('payment_mode')['amount'].agg(['sum', 'count']).round(2)
         payment_mode_summary.columns = ['Total Amount', 'Count']
-        st.dataframe(
-            payment_mode_summary.style.format({
-                'Total Amount': '₹{:,.2f}',
-                'Count': '{:,.0f}'
-            }),
-            use_container_width=True
+        styled_payment_mode = utils.style_mixed_table(
+            payment_mode_summary,
+            currency_cols=['Total Amount'],
+            int_cols=['Count']
         )
+        st.dataframe(styled_payment_mode, use_container_width=True)
 
 except Exception as exc:
     st.error(f"An error occurred while loading or processing expense data: {exc}")
