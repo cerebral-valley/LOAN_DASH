@@ -7,6 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import data_cache
+import utils  # Import centralized utility functions
 import pandas as pd
 import numpy as np
 import calendar
@@ -132,10 +133,9 @@ try:
     
     loan_df["date_of_disbursement"] = pd.to_datetime(loan_df["date_of_disbursement"], errors='coerce')
     loan_df["date_of_release"] = pd.to_datetime(loan_df["date_of_release"], errors='coerce')
-    loan_df['customer_type'] = loan_df['customer_type'].str.title()
-    loan_df['released'] = loan_df['released'].apply(
-        lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
-    )
+    
+    # Normalize customer data using utils
+    loan_df = utils.normalize_customer_data(loan_df)
     
     # Calculate date ranges based on period selection
     today = datetime.now()
@@ -643,14 +643,12 @@ try:
         # Summary table
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.dataframe(
-                top_customers.style.format({
-                    'Outstanding (₹)': '₹{:,.0f}',
-                    'Active Loans': '{:.0f}'
-                }),
-                use_container_width=True,
-                hide_index=True
+            styled_top = utils.style_mixed_table(
+                top_customers,
+                currency_cols=['Outstanding (₹)'],
+                int_cols=['Active Loans']
             )
+            st.dataframe(styled_top, use_container_width=True, hide_index=True)
         with col2:
             total_top10 = top_customers['Outstanding (₹)'].sum()
             concentration = (total_top10 / total_outstanding * 100) if total_outstanding > 0 else 0
@@ -760,17 +758,13 @@ try:
                     
                     display_df = display_df.sort_values('Age (Days)', ascending=False)
                     
-                    st.dataframe(
-                        display_df.style.format({
-                            'Original (₹)': '₹{:,.0f}',
-                            'Outstanding (₹)': '₹{:,.0f}',
-                            'Age (Days)': '{:.0f}',
-                            'LTV (%)': '{:.2f}%',
-                            'Equity Remaining (%)': '{:.2f}%'
-                        }),
-                        use_container_width=True,
-                        hide_index=True
+                    styled_display = utils.style_mixed_table(
+                        display_df,
+                        currency_cols=['Original (₹)', 'Outstanding (₹)'],
+                        int_cols=['Age (Days)'],
+                        pct_cols=['LTV (%)', 'Equity Remaining (%)']
                     )
+                    st.dataframe(styled_display, use_container_width=True, hide_index=True)
                 else:
                     st.success("✅ No private loans aged beyond 365 days")
             
@@ -789,17 +783,13 @@ try:
                     
                     display_df = display_df.sort_values('Age (Days)', ascending=False)
                     
-                    st.dataframe(
-                        display_df.style.format({
-                            'Original (₹)': '₹{:,.0f}',
-                            'Outstanding (₹)': '₹{:,.0f}',
-                            'Age (Days)': '{:.0f}',
-                            'LTV (%)': '{:.2f}%',
-                            'Equity Remaining (%)': '{:.2f}%'
-                        }),
-                        use_container_width=True,
-                        hide_index=True
+                    styled_display = utils.style_mixed_table(
+                        display_df,
+                        currency_cols=['Original (₹)', 'Outstanding (₹)'],
+                        int_cols=['Age (Days)'],
+                        pct_cols=['LTV (%)', 'Equity Remaining (%)']
                     )
+                    st.dataframe(styled_display, use_container_width=True, hide_index=True)
                 else:
                     st.success("✅ No vyapari loans aged beyond 730 days")
             
@@ -819,17 +809,13 @@ try:
                     
                     display_df = display_df.sort_values('Equity Remaining (%)', ascending=True)
                     
-                    st.dataframe(
-                        display_df.style.format({
-                            'Original (₹)': '₹{:,.0f}',
-                            'Outstanding (₹)': '₹{:,.0f}',
-                            'Age (Days)': '{:.0f}',
-                            'LTV (%)': '{:.2f}%',
-                            'Equity Remaining (%)': '{:.2f}%'
-                        }),
-                        use_container_width=True,
-                        hide_index=True
+                    styled_display = utils.style_mixed_table(
+                        display_df,
+                        currency_cols=['Original (₹)', 'Outstanding (₹)'],
+                        int_cols=['Age (Days)'],
+                        pct_cols=['LTV (%)', 'Equity Remaining (%)']
                     )
+                    st.dataframe(styled_display, use_container_width=True, hide_index=True)
                     
                     st.warning("""
                     ⚠️ **Payment Overdue Explanation**: These loans have equity remaining < 1.25%. 
@@ -1040,15 +1026,12 @@ try:
             
             with col1:
                 # Display table
-                st.dataframe(
-                    range_summary.style.format({
-                        'Total Interest (₹)': '₹{:,.0f}',
-                        'Count': '{:.0f}',
-                        'Avg Interest (₹)': '₹{:,.0f}'
-                    }),
-                    use_container_width=True,
-                    hide_index=True
+                styled_range = utils.style_mixed_table(
+                    range_summary,
+                    currency_cols=['Total Interest (₹)', 'Avg Interest (₹)'],
+                    int_cols=['Count']
                 )
+                st.dataframe(styled_range, use_container_width=True, hide_index=True)
             
             with col2:
                 # Bar chart for visual distribution
@@ -1082,15 +1065,12 @@ try:
                 ).round(0)
                 interest_by_type.columns = ['Avg Interest', 'Median Interest', 'Total Interest', 'Count']
                 
-                st.dataframe(
-                    interest_by_type.style.format({
-                        'Avg Interest': '₹{:,.0f}',
-                        'Median Interest': '₹{:,.0f}',
-                        'Total Interest': '₹{:,.0f}',
-                        'Count': '{:.0f}'
-                    }),
-                    use_container_width=True
+                styled_interest = utils.style_mixed_table(
+                    interest_by_type,
+                    currency_cols=['Avg Interest', 'Median Interest', 'Total Interest'],
+                    int_cols=['Count']
                 )
+                st.dataframe(styled_interest, use_container_width=True)
         else:
             st.info("No released loans with interest data available")
         
@@ -1274,17 +1254,13 @@ try:
                     st.plotly_chart(fig, use_container_width=True)
                 
                 with col2:
-                    st.dataframe(
-                        time_summary.style.format({
-                            'Loan Count': '{:.0f}',
-                            'Total Principal': '₹{:,.0f}',
-                            'Total Interest': '₹{:,.0f}',
-                            '% of Total': '{:.1f}%'
-                        }),
-                        use_container_width=True,
-                        hide_index=True,
-                        height=300
+                    styled_time = utils.style_mixed_table(
+                        time_summary,
+                        currency_cols=['Total Principal', 'Total Interest'],
+                        int_cols=['Loan Count'],
+                        pct_cols=['% of Total']
                     )
+                    st.dataframe(styled_time, use_container_width=True, hide_index=True, height=300)
                 
                 # Active loan duration for unreleased loans
                 st.markdown("#### Active Loan Duration (Unreleased)")
@@ -1431,18 +1407,12 @@ try:
         st.markdown("#### Top 20 Customers by Total Principal")
         top_20_customers = customer_stats.head(20).reset_index()
         
-        st.dataframe(
-            top_20_customers.style.format({
-                'Total Loans': '{:.0f}',
-                'Total Principal': '₹{:,.0f}',
-                'Avg Loan Size': '₹{:,.0f}',
-                'Median Loan Size': '₹{:,.0f}',
-                'Total Interest': '₹{:,.0f}'
-            }),
-            use_container_width=True,
-            hide_index=True,
-            height=400
+        styled_top20 = utils.style_mixed_table(
+            top_20_customers,
+            currency_cols=['Total Principal', 'Avg Loan Size', 'Median Loan Size', 'Total Interest'],
+            int_cols=['Total Loans']
         )
+        st.dataframe(styled_top20, use_container_width=True, hide_index=True, height=400)
     
     # ========================================
     # ENHANCED VISUALIZATIONS
@@ -1791,11 +1761,14 @@ try:
                     'pending_loan_amount': 'sum'
                 }).reset_index()
                 
+                styled_maturity = utils.style_mixed_table(
+                    maturity_summary,
+                    currency_cols=['pending_loan_amount'],
+                    int_cols=[]
+                )
+                # Note: 'loan_number' formatted with custom string in column_config
                 st.dataframe(
-                    maturity_summary.style.format({
-                        'loan_number': '{:.0f} loans',
-                        'pending_loan_amount': '₹{:,.0f}'
-                    }),
+                    styled_maturity,
                     use_container_width=True,
                     hide_index=True,
                     column_config={
