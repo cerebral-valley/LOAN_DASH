@@ -6,6 +6,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import data_cache
+import utils
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -82,10 +83,7 @@ try:
     
     loan_df["date_of_disbursement"] = pd.to_datetime(loan_df["date_of_disbursement"], errors='coerce')
     loan_df["date_of_release"] = pd.to_datetime(loan_df["date_of_release"], errors='coerce')
-    loan_df['customer_type'] = loan_df['customer_type'].str.title()
-    loan_df['released'] = loan_df['released'].apply(
-        lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
-    )
+    loan_df = utils.normalize_customer_data(loan_df)
     
     # ========================================
     # CALCULATE KEY METRICS FOR ANALYSIS
@@ -939,16 +937,13 @@ try:
         
         # Detailed yearly table
         st.markdown("### 📋 Yearly Performance Summary")
-        st.dataframe(
-            bcg_df.style.format({
-                'Loan Book (₹M)': '₹{:.2f}M',
-                'Interest Yield (%)': '{:.2f}%',
-                'Avg Repayment Days': '{:.0f} days',
-                'Loan Count': '{:,.0f}'
-            }),
-            use_container_width=True,
-            hide_index=True
+        styled_bcg = utils.style_mixed_table(
+            bcg_df,
+            currency_cols=['Loan Book (₹M)'],
+            pct_cols=['Interest Yield (%)'],
+            int_cols=['Avg Repayment Days', 'Loan Count']
         )
+        st.dataframe(styled_bcg, use_container_width=True, hide_index=True)
     else:
         st.warning("Insufficient data for BCG Matrix analysis. Need released loans from 2020 onwards.")
     
