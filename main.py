@@ -37,5 +37,8 @@ try:
     st.markdown("---")
     st.page_link("pages/11_Smart_Recommendations.py", label="🧠 Smart Recommendations", icon="🧠")
     st.caption("*AI-powered recommendations for loan quality & yield optimization + BCG Matrix*")
+    st.markdown("---")
+    st.page_link("pages/12_Gold_Silver_Rates.py", label="💰 Gold & Silver Rates", icon="💰")
+    st.caption("*Daily market rates with 3-month averages and price trends*")
 except AttributeError:
     pass

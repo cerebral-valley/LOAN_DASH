@@ -16,6 +16,13 @@ from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 
+# Optional imports (may not be available in all environments)
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
 
 # ============================================================================
 # 1. DATA LOADING & CACHING
@@ -792,7 +799,8 @@ def identify_outliers(df, column, method='iqr', threshold=1.5):
         return df[(df[column] < lower_bound) | (df[column] > upper_bound)]
     
     elif method == 'zscore':
-        from scipy import stats
+        if not SCIPY_AVAILABLE:
+            raise ImportError("scipy is required for zscore method. Install with: pip install scipy")
         z_scores = np.abs(stats.zscore(df[column].dropna()))
         return df[z_scores > threshold]
     

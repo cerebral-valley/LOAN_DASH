@@ -219,3 +219,39 @@ def calculate_correct_ltv(df):
     return ltv
 
 
+def get_gold_silver_rates():
+    """
+    Fetch all gold and silver rates from the database.
+    No caching - loads fresh data each time page opens.
+    
+    Returns:
+        pandas.DataFrame: Gold/silver rates with columns:
+            - rate_date, rate_time
+            - ngp_hazir_gold, ngp_hazir_silver (Nagpur spot rates)
+            - ngp_gst_gold, ngp_gst_silver (rates with GST)
+            - usd_inr, cmx_gold_usd, cmx_silver_usd (international)
+    """
+    query = text("""
+        SELECT 
+            rate_date,
+            rate_time,
+            ngp_hazir_gold,
+            ngp_hazir_silver,
+            ngp_gst_gold,
+            ngp_gst_silver,
+            usd_inr,
+            cmx_gold_usd,
+            cmx_silver_usd
+        FROM gold_silver_rates
+        ORDER BY rate_date DESC
+    """)
+    
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn)
+    
+    # Ensure proper data types
+    df['rate_date'] = pd.to_datetime(df['rate_date'])
+    
+    return df
+
+
