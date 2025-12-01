@@ -8,6 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import db # Import the updated db.py
 import data_cache # Import shared caching module
+import utils
 import pandas as pd
 import numpy as np
 import calendar
@@ -38,10 +39,7 @@ try:
     loan_df["date_of_release"] = pd.to_datetime(loan_df["date_of_release"], errors='coerce')
     
     # Normalize data
-    loan_df['customer_type'] = loan_df['customer_type'].str.title()
-    loan_df['released'] = loan_df['released'].apply(
-        lambda x: str(x).upper() if isinstance(x, str) else ('TRUE' if x is True else 'FALSE')
-    )
+    loan_df = utils.normalize_customer_data(loan_df)
     
     # ---- FILTER SECTION ----
     st.subheader("🎯 Filter Options")
@@ -122,10 +120,7 @@ try:
     filtered_df = filtered_df.dropna(subset=[date_col])
     
     # Extract date components
-    filtered_df['year'] = filtered_df[date_col].dt.year
-    filtered_df['month'] = filtered_df[date_col].dt.month
-    filtered_df['month_name'] = filtered_df['month'].map(lambda m: calendar.month_abbr[m])
-    filtered_df['day'] = filtered_df[date_col].dt.day
+    filtered_df = utils.add_date_columns(filtered_df, date_col)
     
     # Year filter
     if selected_year != '--All--':
@@ -154,51 +149,22 @@ try:
         st.subheader("📊 Consolidated Monthly Analysis")
         
         # Create pivot tables for Amount
-        amount_pivot = filtered_df.pivot_table(
-            index='month_name',
-            columns='year',
-            values='loan_amount',
-            aggfunc='sum',
-            fill_value=0
-        )
-        
-        # Reorder months
-        month_order = [calendar.month_abbr[i] for i in range(1, 13)]
-        amount_pivot = amount_pivot.reindex(index=month_order, fill_value=0)
-        
-        # Add Total row
-        amount_pivot.loc['Total'] = amount_pivot.sum(axis=0)
+        amount_pivot = utils.create_monthly_pivot(filtered_df, 'loan_amount', date_col=date_col, agg_func='sum')
         
         # Calculate YoY change
-        amount_yoy = amount_pivot.T.pct_change().T * 100
-        amount_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
+        amount_yoy = utils.calculate_yoy_change(amount_pivot)
         
         # Calculate MoM change (excluding Total row)
-        amount_mom = amount_pivot.iloc[:-1].pct_change() * 100
-        amount_mom.replace([np.inf, -np.inf], np.nan, inplace=True)
-        # Add back empty Total row for alignment
-        amount_mom.loc['Total'] = np.nan
+        amount_mom = utils.calculate_mom_change(amount_pivot)
         
         # Create pivot tables for Quantity
-        quantity_pivot = filtered_df.pivot_table(
-            index='month_name',
-            columns='year',
-            values='loan_number',
-            aggfunc='count',
-            fill_value=0
-        )
-        
-        quantity_pivot = quantity_pivot.reindex(index=month_order, fill_value=0)
-        quantity_pivot.loc['Total'] = quantity_pivot.sum(axis=0)
+        quantity_pivot = utils.create_monthly_pivot(filtered_df, 'loan_number', date_col=date_col, agg_func='count')
         
         # Calculate YoY change for quantity
-        quantity_yoy = quantity_pivot.T.pct_change().T * 100
-        quantity_yoy.replace([np.inf, -np.inf], np.nan, inplace=True)
+        quantity_yoy = utils.calculate_yoy_change(quantity_pivot)
         
         # Calculate MoM change for quantity
-        quantity_mom = quantity_pivot.iloc[:-1].pct_change() * 100
-        quantity_mom.replace([np.inf, -np.inf], np.nan, inplace=True)
-        quantity_mom.loc['Total'] = np.nan
+        quantity_mom = utils.calculate_mom_change(quantity_pivot)
         
         # Display Amount tables
         st.markdown("### 💰 Loan Amount Analysis")
@@ -207,13 +173,8 @@ try:
         
         with col1:
             st.markdown("**Amount (₹)**")
-            st.dataframe(
-                amount_pivot.style.format("{:,.0f}", na_rep="")
-                .set_properties(subset=None, **{"text-align": "right"})
-                .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-                use_container_width=True,
-                height=550
-            )
+            styled_amount = utils.style_currency_table(amount_pivot, currency_cols=amount_pivot.columns.tolist())
+            st.dataframe(styled_amount, use_container_width=True, height=550)
         
         with col2:
             st.markdown("**YoY Change (%)**")
@@ -246,13 +207,8 @@ try:
         
         with col1:
             st.markdown("**Quantity (Count)**")
-            st.dataframe(
-                quantity_pivot.style.format("{:,.0f}", na_rep="")
-                .set_properties(subset=None, **{"text-align": "right"})
-                .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}]),
-                use_container_width=True,
-                height=550
-            )
+            styled_quantity = utils.style_mixed_table(quantity_pivot, int_cols=quantity_pivot.columns.tolist())
+            st.dataframe(styled_quantity, use_container_width=True, height=550)
         
         with col2:
             st.markdown("**YoY Change (%)**")
