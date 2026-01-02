@@ -4,8 +4,32 @@ __pycache__/
 # Env
 .env
 .env.template
+.env.local
 # OS
 .DS_Store
 # VSCode
 .vscode/
 .vscode/settings.json
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+
+# Next.js
+.next/
+out/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+
+# Backend
+backend/dist/
+backend/node_modules/
+
+# Frontend
+frontend/.next/
+frontend/out/
+frontend/node_modules/
