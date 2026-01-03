@@ -16,7 +16,6 @@ interface MonthlyProjection {
 }
 
 export default function ProjectionsPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
   const [projections, setProjections] = useState<MonthlyProjection[]>([]);
   const [totalProjectedRevenue, setTotalProjectedRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -24,6 +23,7 @@ export default function ProjectionsPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -31,7 +31,6 @@ export default function ProjectionsPage() {
       setLoading(true);
       const response = await loanApi.getAll();
       const loansData = response.data;
-      setLoans(loansData);
 
       // Calculate projections
       calculateProjections(loansData);

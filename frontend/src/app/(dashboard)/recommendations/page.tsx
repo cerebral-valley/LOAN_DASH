@@ -26,7 +26,6 @@ interface PortfolioMetrics {
 }
 
 export default function RecommendationsPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +33,7 @@ export default function RecommendationsPage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -41,7 +41,6 @@ export default function RecommendationsPage() {
       setLoading(true);
       const response = await loanApi.getAll();
       const loansData = response.data;
-      setLoans(loansData);
 
       // Calculate metrics
       const activeLoans = loansData.filter((loan) => loan.released !== 'TRUE');
@@ -198,10 +197,7 @@ export default function RecommendationsPage() {
     });
 
     // Customer Retention
-    const releasedLoans = allLoans.filter((loan) => loan.released === 'TRUE');
     const uniqueCustomersAll = new Set(allLoans.filter((l) => l.customer_name).map((l) => l.customer_name));
-    const uniqueCustomersReleased = new Set(releasedLoans.filter((l) => l.customer_name).map((l) => l.customer_name));
-    const uniqueCustomersActive = new Set(activeLoans.filter((l) => l.customer_name).map((l) => l.customer_name));
 
     // Simple retention: customers who took another loan after release
     const customersWithMultipleLoans = new Map<string, number>();
