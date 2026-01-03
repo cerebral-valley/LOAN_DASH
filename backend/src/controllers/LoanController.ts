@@ -132,4 +132,79 @@ export class LoanController {
       res.status(500).json({ error: 'Failed to fetch loan stats' });
     }
   };
+
+  getVyapariCustomers = async (req: Request, res: Response) => {
+    try {
+      const customers = await this.loanRepository
+        .createQueryBuilder('loan')
+        .select('DISTINCT loan.customer_id', 'customer_id')
+        .addSelect('loan.customer_name', 'customer_name')
+        .addSelect('loan.customer_type', 'customer_type')
+        .where("UPPER(loan.customer_type) = 'VYAPARI'")
+        .orderBy('loan.customer_name', 'ASC')
+        .getRawMany();
+
+      res.json(customers);
+    } catch (error) {
+      console.error('Error fetching vyapari customers:', error);
+      res.status(500).json({ error: 'Failed to fetch vyapari customers' });
+    }
+  };
+
+  getLoansByCustomer = async (req: Request, res: Response) => {
+    try {
+      const { customerName } = req.params;
+      const loans = await this.loanRepository
+        .createQueryBuilder('loan')
+        .where('loan.customer_name = :customerName', { customerName })
+        .orderBy('loan.date_of_disbursement', 'DESC')
+        .getMany();
+
+      res.json(loans);
+    } catch (error) {
+      console.error('Error fetching loans by customer:', error);
+      res.status(500).json({ error: 'Failed to fetch loans by customer' });
+    }
+  };
+
+  getOverviewStats = async (req: Request, res: Response) => {
+    try {
+      const loans = await this.loanRepository.find();
+
+      // Calculate cumulative metrics
+      const totalDisbursed = loans.reduce((sum, loan) => sum + (parseFloat(String(loan.loan_amount)) || 0), 0);
+      const totalOutstanding = loans
+        .filter((loan) => loan.released !== 'TRUE')
+        .reduce((sum, loan) => sum + (parseFloat(String(loan.pending_loan_amount)) || 0), 0);
+      const totalInterestReceived = loans.reduce(
+        (sum, loan) => sum + (parseFloat(String(loan.interest_deposited_till_date)) || 0),
+        0
+      );
+
+      // Group by date for time series
+      const loansByDate = loans.reduce((acc: any, loan) => {
+        const date = loan.date_of_disbursement?.toString().split('T')[0];
+        if (date) {
+          if (!acc[date]) {
+            acc[date] = { disbursed: 0, count: 0 };
+          }
+          acc[date].disbursed += parseFloat(String(loan.loan_amount)) || 0;
+          acc[date].count += 1;
+        }
+        return acc;
+      }, {});
+
+      res.json({
+        totalDisbursed,
+        totalOutstanding,
+        totalInterestReceived,
+        totalLoans: loans.length,
+        activeLoans: loans.filter((loan) => loan.released !== 'TRUE').length,
+        loansByDate,
+      });
+    } catch (error) {
+      console.error('Error fetching overview stats:', error);
+      res.status(500).json({ error: 'Failed to fetch overview stats' });
+    }
+  };
 }
