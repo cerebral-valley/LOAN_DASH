@@ -216,8 +216,42 @@ export default function YieldPage() {
 
   const handleDownloadCSV = async () => {
     try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'interest-yield-analysis.csv');
+      // Export the calculated yield analysis data
+      const csvData = [
+        {
+          'Portfolio Yield': metrics?.portfolioYield.toFixed(2) + '%',
+          'Simple Return': metrics?.simpleReturn.toFixed(2) + '%',
+          'Total Interest': '₹' + ((metrics?.totalInterest || 0) / 1000000).toFixed(2) + 'M',
+          'Total Capital': '₹' + ((metrics?.totalCapital || 0) / 1000000).toFixed(2) + 'M',
+          'Weighted Avg Days': metrics?.weightedAvgDays?.toString() || '0',
+        },
+        ...holdingPeriodSegments.map((segment) => ({
+          Segment: segment.segment,
+          'Portfolio Yield': segment.portfolioYield.toFixed(2) + '%',
+          Capital: '₹' + segment.capital.toLocaleString('en-IN'),
+          '% of Portfolio': segment.portfolioPercentage.toFixed(1) + '%',
+          'Loan Count': segment.loanCount.toString(),
+          'Avg Holding Days': segment.avgDays + ' days',
+        })),
+        ...loanAmountBuckets.map((bucket) => ({
+          'Loan Amount Range': bucket.range,
+          'Portfolio Yield': bucket.portfolioYield.toFixed(2) + '%',
+          Capital: '₹' + bucket.capital.toLocaleString('en-IN'),
+          '% of Portfolio': bucket.portfolioPercentage.toFixed(1) + '%',
+          'Loan Count': bucket.loanCount.toString(),
+          'Avg Holding Days': bucket.avgDays + ' days',
+        })),
+      ];
+
+      const csvString = [
+        Object.keys(csvData[0]).join(','),
+        ...csvData.map((row) =>
+          Object.values(row).map((val) => `"${val}"`).join(',')
+        )
+      ].join('\n');
+
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      downloadCSV(blob, 'interest-yield-analysis.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }

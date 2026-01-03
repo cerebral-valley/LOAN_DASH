@@ -14,6 +14,32 @@ interface GoldSilverRate {
   ngp_gst_silver: number;
 }
 
+// Mock data for gold and silver rates
+// In production, this would be fetched from the backend API
+const MOCK_GOLD_SILVER_RATES: GoldSilverRate[] = [
+  {
+    rate_date: new Date().toISOString().split('T')[0],
+    ngp_hazir_gold: 74500,
+    ngp_hazir_silver: 88500,
+    ngp_gst_gold: 78630,
+    ngp_gst_silver: 93390
+  },
+  {
+    rate_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+    ngp_hazir_gold: 74300,
+    ngp_hazir_silver: 88200,
+    ngp_gst_gold: 78420,
+    ngp_gst_silver: 93072
+  },
+  {
+    rate_date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
+    ngp_hazir_gold: 74800,
+    ngp_hazir_silver: 88800,
+    ngp_gst_gold: 78946,
+    ngp_gst_silver: 93696
+  }
+];
+
 export default function RatesPage() {
   const [rates, setRates] = useState<GoldSilverRate[]>([]);
   const [latestRate, setLatestRate] = useState<GoldSilverRate | null>(null);
@@ -30,29 +56,7 @@ export default function RatesPage() {
       
       // Mock data since we don't have a backend endpoint for this yet
       // In production, this would call an API endpoint
-      const mockRates: GoldSilverRate[] = [
-        {
-          rate_date: new Date().toISOString().split('T')[0],
-          ngp_hazir_gold: 74500,
-          ngp_hazir_silver: 88500,
-          ngp_gst_gold: 78630,
-          ngp_gst_silver: 93390
-        },
-        {
-          rate_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-          ngp_hazir_gold: 74300,
-          ngp_hazir_silver: 88200,
-          ngp_gst_gold: 78420,
-          ngp_gst_silver: 93072
-        },
-        {
-          rate_date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
-          ngp_hazir_gold: 74800,
-          ngp_hazir_silver: 88800,
-          ngp_gst_gold: 78946,
-          ngp_gst_silver: 93696
-        }
-      ];
+      const mockRates = MOCK_GOLD_SILVER_RATES;
 
       setRates(mockRates);
       setLatestRate(mockRates[0]);

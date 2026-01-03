@@ -15,6 +15,9 @@ interface MonthlyProjection {
   expectedOutstanding: number;
 }
 
+// Default interest rate assumption when no rate data is available
+const DEFAULT_INTEREST_RATE = 12; // 12% per annum
+
 export default function ProjectionsPage() {
   const [projections, setProjections] = useState<MonthlyProjection[]>([]);
   const [totalProjectedRevenue, setTotalProjectedRevenue] = useState(0);
@@ -57,7 +60,7 @@ export default function ProjectionsPage() {
     const loansWithRate = activeLoans.filter((loan) => loan.interest_rate && loan.interest_rate > 0);
     const avgInterestRate = loansWithRate.length > 0
       ? loansWithRate.reduce((sum, loan) => sum + (loan.interest_rate || 0), 0) / loansWithRate.length
-      : 12; // Default 12% if no rates available
+      : DEFAULT_INTEREST_RATE; // Use default if no rates available
 
     // Calculate historical monthly averages for projections
     const releasedLoans = loansData.filter((loan) => loan.released === 'TRUE');

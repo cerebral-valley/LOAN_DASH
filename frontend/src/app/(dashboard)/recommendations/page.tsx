@@ -251,6 +251,11 @@ export default function RecommendationsPage() {
   };
 
   const handleDownloadRecommendations = () => {
+    if (recommendations.length === 0) {
+      console.warn('No recommendations to export');
+      return;
+    }
+
     const csvContent = recommendations.map((rec) => ({
       Category: rec.category,
       Priority: rec.priority,
