@@ -19,6 +19,7 @@ export const parseNumeric = (value: unknown): number | undefined => {
 // Helper to check if a loan is released (handles inconsistent boolean field values: TRUE, True, FALSE, False)
 export const isLoanReleased = (released: string | undefined | null): boolean => {
   if (released === null || released === undefined) return false;
+  if (typeof released !== 'string') return false;
   return released.toUpperCase() === 'TRUE';
 };
 
