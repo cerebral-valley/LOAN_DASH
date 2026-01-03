@@ -34,27 +34,45 @@ export default function PerformancePage() {
     }
   };
 
+  // Helper to safely get numeric value
+  const safeNumber = (value: number | undefined | null): number => {
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    return isNaN(num) ? 0 : num;
+  };
+
   // Calculate performance metrics
-  const totalDisbursed = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-  const totalOutstanding = loans.reduce(
-    (sum, loan) => sum + (loan.pending_loan_amount || 0),
+  const totalDisbursed = loans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
+  
+  // For released loans, pending_loan_amount should be 0 (fully paid)
+  // For active loans, pending_loan_amount is the outstanding amount
+  const releasedLoans = loans.filter((loan) => loan.released === 'TRUE');
+  const activeLoans = loans.filter((loan) => loan.released !== 'TRUE');
+  
+  const totalOutstanding = activeLoans.reduce(
+    (sum, loan) => sum + safeNumber(loan.pending_loan_amount || loan.loan_amount),
     0
   );
-  const totalInterestReceived = loans.reduce(
-    (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
+  
+  // Use interest_amount for released loans (actual interest earned)
+  const totalInterestReceived = releasedLoans.reduce(
+    (sum, loan) => sum + safeNumber(loan.interest_amount),
     0
   );
 
+  // Collection Rate: How much principal has been repaid
+  // Released loans count as fully collected, active loans are outstanding
+  const totalCollected = releasedLoans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
   const collectionRate = totalDisbursed > 0
-    ? ((totalDisbursed - totalOutstanding) / totalDisbursed) * 100
+    ? (totalCollected / totalDisbursed) * 100
     : 0;
 
+  // Interest Yield: Interest earned as % of disbursed amount
   const interestYield = totalDisbursed > 0
     ? (totalInterestReceived / totalDisbursed) * 100
     : 0;
 
-  const activeLoans = loans.filter((loan) => loan.released !== 'TRUE');
-  const activeRate = (activeLoans.length / loans.length) * 100;
+  const activeRate = loans.length > 0 ? (activeLoans.length / loans.length) * 100 : 0;
 
   // Performance by customer type
   const performanceByType = loans.reduce((acc, loan) => {
@@ -64,6 +82,7 @@ export default function PerformancePage() {
         type,
         count: 0,
         disbursed: 0,
+        collected: 0,
         outstanding: 0,
         interestReceived: 0,
         collectionRate: 0,
@@ -71,10 +90,18 @@ export default function PerformancePage() {
       };
     }
 
+    const loanAmount = safeNumber(loan.loan_amount);
+    const isReleased = loan.released === 'TRUE';
+    
     acc[type].count++;
-    acc[type].disbursed += loan.loan_amount || 0;
-    acc[type].outstanding += loan.pending_loan_amount || 0;
-    acc[type].interestReceived += loan.interest_deposited_till_date || 0;
+    acc[type].disbursed += loanAmount;
+    
+    if (isReleased) {
+      acc[type].collected += loanAmount;
+      acc[type].interestReceived += safeNumber(loan.interest_amount);
+    } else {
+      acc[type].outstanding += safeNumber(loan.pending_loan_amount) || loanAmount;
+    }
 
     return acc;
   }, {} as Record<string, any>);
@@ -82,7 +109,7 @@ export default function PerformancePage() {
   // Calculate rates for each type
   Object.values(performanceByType).forEach((perf: any) => {
     perf.collectionRate = perf.disbursed > 0
-      ? ((perf.disbursed - perf.outstanding) / perf.disbursed) * 100
+      ? (perf.collected / perf.disbursed) * 100
       : 0;
     perf.yieldRate = perf.disbursed > 0
       ? (perf.interestReceived / perf.disbursed) * 100
