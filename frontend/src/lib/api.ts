@@ -126,6 +126,21 @@ export interface LoanStats {
   totalInterestReceived: number;
 }
 
+export interface OverviewStats {
+  totalDisbursed: number;
+  totalOutstanding: number;
+  totalInterestReceived: number;
+  totalLoans: number;
+  activeLoans: number;
+  loansByDate: Record<string, { disbursed: number; count: number }>;
+}
+
+export interface VyapariCustomer {
+  customer_id: string;
+  customer_name: string;
+  customer_type: string;
+}
+
 export interface ExpenseStats {
   totalExpenses: number;
   totalAmount: number;
@@ -155,7 +170,16 @@ export const loanApi = {
     const response = await api.get<Record<string, unknown>[]>(`/loans/customer-type/${type}`);
     return { ...response, data: response.data.map(transformLoan) };
   },
+  getByCustomer: async (customerName: string) => {
+    const response = await api.get<Record<string, unknown>[]>(`/loans/customer/${customerName}`);
+    return { ...response, data: response.data.map(transformLoan) };
+  },
+  getVyapariCustomers: async () => {
+    const response = await api.get<VyapariCustomer[]>('/loans/vyapari/customers');
+    return response;
+  },
   getStats: () => api.get<LoanStats>('/loans/stats'),
+  getOverviewStats: () => api.get<OverviewStats>('/loans/overview/stats'),
   downloadCSV: () => api.get('/loans/download/csv', { responseType: 'blob' }),
 };
 

@@ -1,5 +1,3 @@
-'use client';
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type PageConfig = {
@@ -110,8 +108,9 @@ const PAGE_CONFIG: Record<string, PageConfig> = {
   },
 };
 
-export default function PlaceholderPage({ params }: { params: { page: string } }) {
-  const config = PAGE_CONFIG[params.page];
+export default async function PlaceholderPage({ params }: { params: Promise<{ page: string }> }) {
+  const { page } = await params;
+  const config = PAGE_CONFIG[page];
 
   const title = config?.title ?? 'Coming Soon';
   const description =
