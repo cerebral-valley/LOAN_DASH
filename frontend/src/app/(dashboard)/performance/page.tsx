@@ -11,12 +11,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
 import { Download, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
+
+interface PerformanceByType {
+  type: string;
+  count: number;
+  disbursed: number;
+  collected: number;
+  outstanding: number;
+  interestReceived: number;
+  collectionRate: number;
+  yieldRate: number;
+}
 
 export default function PerformancePage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLoans();
@@ -25,9 +37,11 @@ export default function PerformancePage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await loanApi.getAll();
       setLoans(response.data);
     } catch (err) {
+      setError('Failed to fetch performance data. Please ensure the backend server is running.');
       console.error('Error fetching loans:', err);
     } finally {
       setLoading(false);
@@ -46,13 +60,8 @@ export default function PerformancePage() {
   
   // For released loans, pending_loan_amount should be 0 (fully paid)
   // For active loans, pending_loan_amount is the outstanding amount
-  const releasedLoans = loans.filter((loan) => loan.released === 'TRUE');
-  const activeLoans = loans.filter((loan) => loan.released !== 'TRUE');
-  
-  const totalOutstanding = activeLoans.reduce(
-    (sum, loan) => sum + safeNumber(loan.pending_loan_amount || loan.loan_amount),
-    0
-  );
+  const releasedLoans = loans.filter((loan) => isLoanReleased(loan.released));
+  const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
   
   // Use interest_amount for released loans (actual interest earned)
   const totalInterestReceived = releasedLoans.reduce(
@@ -91,7 +100,7 @@ export default function PerformancePage() {
     }
 
     const loanAmount = safeNumber(loan.loan_amount);
-    const isReleased = loan.released === 'TRUE';
+    const isReleased = isLoanReleased(loan.released);
     
     acc[type].count++;
     acc[type].disbursed += loanAmount;
@@ -104,10 +113,10 @@ export default function PerformancePage() {
     }
 
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, PerformanceByType>);
 
   // Calculate rates for each type
-  Object.values(performanceByType).forEach((perf: any) => {
+  Object.values(performanceByType).forEach((perf) => {
     perf.collectionRate = perf.disbursed > 0
       ? (perf.collected / perf.disbursed) * 100
       : 0;
@@ -117,12 +126,12 @@ export default function PerformancePage() {
   });
 
   const performanceData = Object.values(performanceByType).sort(
-    (a: any, b: any) => b.disbursed - a.disbursed
+    (a, b) => b.disbursed - a.disbursed
   );
 
   const handleDownloadCSV = async () => {
     try {
-      const csvData = performanceData.map((perf: any) => ({
+      const csvData = performanceData.map((perf) => ({
         'Customer Type': perf.type,
         'Loan Count': perf.count,
         'Total Disbursed': perf.disbursed,
@@ -135,7 +144,7 @@ export default function PerformancePage() {
       const csvString =
         Object.keys(csvData[0]).join(',') +
         '\n' +
-        csvData.map((row: any) => Object.values(row).join(',')).join('\n');
+        csvData.map((row) => Object.values(row).join(',')).join('\n');
 
       const blob = new Blob([csvString], { type: 'text/csv' });
       downloadCSV(blob, 'performance-dashboard.csv');
@@ -148,6 +157,22 @@ export default function PerformancePage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading performance data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchLoans}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -237,7 +262,7 @@ export default function PerformancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {performanceData.map((perf: any) => (
+                {performanceData.map((perf) => (
                   <TableRow key={perf.type}>
                     <TableCell className="font-medium">{perf.type}</TableCell>
                     <TableCell className="text-right">{perf.count}</TableCell>
@@ -274,9 +299,9 @@ export default function PerformancePage() {
             <div className="space-y-4">
               {performanceData
                 .slice()
-                .sort((a: any, b: any) => b.yieldRate - a.yieldRate)
+                .sort((a, b) => b.yieldRate - a.yieldRate)
                 .slice(0, 5)
-                .map((perf: any, index: number) => (
+                .map((perf, index) => (
                   <div key={perf.type} className="flex items-center justify-between border-b pb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold text-muted-foreground">
@@ -303,13 +328,13 @@ export default function PerformancePage() {
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Best Collection Rate</span>
                 <span className="text-sm font-bold text-green-600">
-                  {Math.max(...performanceData.map((p: any) => p.collectionRate)).toFixed(1)}%
+                  {Math.max(...performanceData.map((p) => p.collectionRate)).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Best Yield Rate</span>
                 <span className="text-sm font-bold text-blue-600">
-                  {Math.max(...performanceData.map((p: any) => p.yieldRate)).toFixed(2)}%
+                  {Math.max(...performanceData.map((p) => p.yieldRate)).toFixed(2)}%
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">

@@ -10,10 +10,17 @@ export const api = axios.create({
 });
 
 // Helper to parse numeric fields from string (TypeORM returns decimals as strings)
-const parseNumeric = (value: unknown): number | undefined => {
+export const parseNumeric = (value: unknown): number | undefined => {
   if (value === null || value === undefined || value === '') return undefined;
   const parsed = parseFloat(String(value));
   return isNaN(parsed) ? undefined : parsed;
+};
+
+// Helper to check if a loan is released (handles inconsistent boolean field values: TRUE, True, FALSE, False)
+export const isLoanReleased = (released: string | undefined | null): boolean => {
+  if (released === null || released === undefined) return false;
+  if (typeof released !== 'string') return false;
+  return released.toUpperCase() === 'TRUE';
 };
 
 // Transform loan data to ensure numeric fields are numbers

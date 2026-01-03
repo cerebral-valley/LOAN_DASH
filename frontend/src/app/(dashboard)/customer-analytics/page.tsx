@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
 import { Download, Users, TrendingUp, Award } from 'lucide-react';
 
 interface CustomerMetrics {
@@ -28,6 +28,7 @@ interface CustomerMetrics {
 export default function CustomerAnalyticsPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLoans();
@@ -36,9 +37,11 @@ export default function CustomerAnalyticsPage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await loanApi.getAll();
       setLoans(response.data);
     } catch (err) {
+      setError('Failed to fetch customer analytics data. Please ensure the backend server is running.');
       console.error('Error fetching loans:', err);
     } finally {
       setLoading(false);
@@ -67,7 +70,7 @@ export default function CustomerAnalyticsPage() {
     acc[customerId].totalBorrowed += loan.loan_amount || 0;
     acc[customerId].totalOutstanding += loan.pending_loan_amount || 0;
     acc[customerId].totalInterestPaid += loan.interest_deposited_till_date || 0;
-    if (loan.released !== 'TRUE') {
+    if (!isLoanReleased(loan.released)) {
       acc[customerId].activeLoans++;
     }
 
@@ -122,6 +125,22 @@ export default function CustomerAnalyticsPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading customer analytics...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchLoans}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

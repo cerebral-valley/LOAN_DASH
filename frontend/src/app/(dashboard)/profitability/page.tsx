@@ -10,6 +10,7 @@ export default function ProfitabilityPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -18,6 +19,7 @@ export default function ProfitabilityPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const [loansRes, expensesRes] = await Promise.all([
         loanApi.getAll(),
         expenseApi.getAll(),
@@ -25,6 +27,7 @@ export default function ProfitabilityPage() {
       setLoans(loansRes.data);
       setExpenses(expensesRes.data);
     } catch (err) {
+      setError('Failed to fetch profitability data. Please ensure the backend server is running.');
       console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
@@ -110,6 +113,22 @@ export default function ProfitabilityPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading profitability data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchData}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

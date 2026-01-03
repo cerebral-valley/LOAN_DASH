@@ -11,12 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
 import { Download, PieChart } from 'lucide-react';
 
 export default function PortfolioPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLoans();
@@ -25,9 +26,11 @@ export default function PortfolioPage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await loanApi.getAll();
       setLoans(response.data);
     } catch (err) {
+      setError('Failed to fetch portfolio data. Please ensure the backend server is running.');
       console.error('Error fetching loans:', err);
     } finally {
       setLoading(false);
@@ -44,8 +47,8 @@ export default function PortfolioPage() {
   };
 
   // Calculate portfolio metrics
-  const activeLoans = loans.filter((l) => l.released !== 'TRUE');
-  const releasedLoans = loans.filter((l) => l.released === 'TRUE');
+  const activeLoans = loans.filter((l) => !isLoanReleased(l.released));
+  const releasedLoans = loans.filter((l) => isLoanReleased(l.released));
 
   const portfolioByType = loans.reduce((acc, loan) => {
     const type = loan.customer_type || 'Unknown';
@@ -85,6 +88,22 @@ export default function PortfolioPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading portfolio data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchLoans}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
