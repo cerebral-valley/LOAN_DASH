@@ -17,6 +17,7 @@ import { Download, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 export default function PaymentHistoryPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLoans();
@@ -25,9 +26,11 @@ export default function PaymentHistoryPage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await loanApi.getAll();
       setLoans(response.data);
     } catch (err) {
+      setError('Failed to fetch payment history data. Please ensure the backend server is running.');
       console.error('Error fetching loans:', err);
     } finally {
       setLoading(false);
@@ -97,6 +100,22 @@ export default function PaymentHistoryPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading payment history...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchLoans}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

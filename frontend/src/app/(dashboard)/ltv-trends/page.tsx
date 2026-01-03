@@ -11,12 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
 import { Download, Scale, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function LTVTrendsPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLoans();
@@ -25,9 +26,11 @@ export default function LTVTrendsPage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await loanApi.getAll();
       setLoans(response.data);
     } catch (err) {
+      setError('Failed to fetch LTV trends data. Please ensure the backend server is running.');
       console.error('Error fetching loans:', err);
     } finally {
       setLoading(false);
@@ -39,7 +42,7 @@ export default function LTVTrendsPage() {
     ? loans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / loans.length
     : 0;
 
-  const activeLoans = loans.filter((loan) => loan.released !== 'TRUE');
+  const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
   const avgActiveLTV = activeLoans.length > 0
     ? activeLoans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / activeLoans.length
     : 0;
@@ -83,7 +86,7 @@ export default function LTVTrendsPage() {
         'Valuation': loan.valuation,
         'Loan Amount': loan.loan_amount,
         'LTV %': loan.ltv_given,
-        'Status': loan.released === 'TRUE' ? 'Released' : 'Active',
+        'Status': isLoanReleased(loan.released) ? 'Released' : 'Active',
       }));
 
       const csvString =
@@ -102,6 +105,22 @@ export default function LTVTrendsPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading LTV trends...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchLoans}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -243,12 +262,12 @@ export default function LTVTrendsPage() {
                     <TableCell>
                       <span
                         className={`rounded-full px-2 py-1 text-xs ${
-                          loan.released === 'TRUE'
+                          isLoanReleased(loan.released)
                             ? 'bg-gray-100 text-gray-700'
                             : 'bg-green-100 text-green-700'
                         }`}
                       >
-                        {loan.released === 'TRUE' ? 'Released' : 'Active'}
+                        {isLoanReleased(loan.released) ? 'Released' : 'Active'}
                       </span>
                     </TableCell>
                   </TableRow>

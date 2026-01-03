@@ -28,6 +28,7 @@ interface RiskMetrics {
 export default function RiskAssessmentPage() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLoans();
@@ -36,9 +37,11 @@ export default function RiskAssessmentPage() {
   const fetchLoans = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await loanApi.getActive();
       setLoans(response.data);
     } catch (err) {
+      setError('Failed to fetch risk assessment data. Please ensure the backend server is running.');
       console.error('Error fetching loans:', err);
     } finally {
       setLoading(false);
@@ -165,6 +168,22 @@ export default function RiskAssessmentPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading risk assessment...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle>Connection Error</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchLoans}>Retry</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
