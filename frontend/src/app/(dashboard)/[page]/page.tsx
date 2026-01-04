@@ -61,51 +61,6 @@ const PAGE_CONFIG: Record<string, PageConfig> = {
       'CSV export powered by backend endpoints',
     ],
   },
-  expenses: {
-    title: 'Expense Tracker',
-    description: 'Operational expense ledger aligned with expense APIs.',
-    highlights: [
-      'Expense list and search',
-      'Payment mode and ledger level breakdowns',
-      'CSV export for accounting reviews',
-    ],
-  },
-  yield: {
-    title: 'Interest Yield',
-    description: 'Interest yield monitoring with backend formulas.',
-    highlights: [
-      'Interest to principal ratios',
-      'Released vs. active yield comparison',
-      'Identify underperforming segments',
-    ],
-  },
-  recommendations: {
-    title: 'Smart Recommendations',
-    description: 'AI-assisted suggestions for collections and renewals.',
-    highlights: [
-      'Priority list for follow-ups',
-      'Renewal and release suggestions',
-      'Signals powered by portfolio data',
-    ],
-  },
-  rates: {
-    title: 'Gold & Silver Rates',
-    description: 'Rate management screen to sync with imported prices.',
-    highlights: [
-      'Latest gold and silver prices',
-      'Historical view for rate changes',
-      'Hooks for automated rate ingestion',
-    ],
-  },
-  projections: {
-    title: 'Revenue Projections',
-    description: 'Forward-looking revenue and cash flow projections.',
-    highlights: [
-      'Projected interest inflows',
-      'Scenario planning for collections',
-      'What-if analysis for rate movements',
-    ],
-  },
 };
 
 export default async function PlaceholderPage({ params }: { params: Promise<{ page: string }> }) {
