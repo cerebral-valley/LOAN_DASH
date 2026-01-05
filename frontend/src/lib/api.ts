@@ -150,29 +150,44 @@ export interface ExpenseStats {
 
 // Loan API calls
 export const loanApi = {
-  getAll: async () => {
-    const response = await api.get<Record<string, unknown>[]>('/loans');
-    return { ...response, data: response.data.map(transformLoan) };
+  getAll: async (page = 1, limit = 1000) => {
+    const response = await api.get<any>(`/loans?page=${page}&limit=${limit}`);
+    // Handle both old and new response formats
+    const data = response.data.data || response.data;
+    const loans = Array.isArray(data) ? data : [];
+    return { ...response, data: loans.map(transformLoan) };
   },
   getById: async (id: number) => {
     const response = await api.get<Record<string, unknown>>(`/loans/${id}`);
     return { ...response, data: transformLoan(response.data) };
   },
-  getActive: async () => {
-    const response = await api.get<Record<string, unknown>[]>('/loans/active');
-    return { ...response, data: response.data.map(transformLoan) };
+  getActive: async (page = 1, limit = 1000) => {
+    const response = await api.get<any>(`/loans/active?page=${page}&limit=${limit}`);
+    // Handle both old and new response formats
+    const data = response.data.data || response.data;
+    const loans = Array.isArray(data) ? data : [];
+    return { ...response, data: loans.map(transformLoan) };
   },
-  getReleased: async () => {
-    const response = await api.get<Record<string, unknown>[]>('/loans/released');
-    return { ...response, data: response.data.map(transformLoan) };
+  getReleased: async (page = 1, limit = 1000) => {
+    const response = await api.get<any>(`/loans/released?page=${page}&limit=${limit}`);
+    // Handle both old and new response formats
+    const data = response.data.data || response.data;
+    const loans = Array.isArray(data) ? data : [];
+    return { ...response, data: loans.map(transformLoan) };
   },
-  getByCustomerType: async (type: string) => {
-    const response = await api.get<Record<string, unknown>[]>(`/loans/customer-type/${type}`);
-    return { ...response, data: response.data.map(transformLoan) };
+  getByCustomerType: async (type: string, page = 1, limit = 1000) => {
+    const response = await api.get<any>(`/loans/customer-type/${type}?page=${page}&limit=${limit}`);
+    // Handle both old and new response formats
+    const data = response.data.data || response.data;
+    const loans = Array.isArray(data) ? data : [];
+    return { ...response, data: loans.map(transformLoan) };
   },
-  getByCustomer: async (customerName: string) => {
-    const response = await api.get<Record<string, unknown>[]>(`/loans/customer/${customerName}`);
-    return { ...response, data: response.data.map(transformLoan) };
+  getByCustomer: async (customerName: string, page = 1, limit = 1000) => {
+    const response = await api.get<any>(`/loans/customer/${customerName}?page=${page}&limit=${limit}`);
+    // Handle both old and new response formats
+    const data = response.data.data || response.data;
+    const loans = Array.isArray(data) ? data : [];
+    return { ...response, data: loans.map(transformLoan) };
   },
   getVyapariCustomers: async () => {
     const response = await api.get<VyapariCustomer[]>('/loans/vyapari/customers');
@@ -185,9 +200,12 @@ export const loanApi = {
 
 // Expense API calls
 export const expenseApi = {
-  getAll: async () => {
-    const response = await api.get<Record<string, unknown>[]>('/expenses');
-    return { ...response, data: response.data.map(transformExpense) };
+  getAll: async (page = 1, limit = 1000) => {
+    const response = await api.get<any>(`/expenses?page=${page}&limit=${limit}`);
+    // Handle both old and new response formats
+    const data = response.data.data || response.data;
+    const expenses = Array.isArray(data) ? data : [];
+    return { ...response, data: expenses.map(transformExpense) };
   },
   getById: async (id: number) => {
     const response = await api.get<Record<string, unknown>>(`/expenses/${id}`);

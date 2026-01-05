@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { initializeDatabase } from './config/database';
+import { runMigrations } from './migrations/runMigrations';
 import loanRoutes from './routes/loanRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 
@@ -11,6 +13,7 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
+app.use(compression()); // Enable gzip compression for responses
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -36,6 +39,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 const startServer = async () => {
   try {
     await initializeDatabase();
+    await runMigrations();
     
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);

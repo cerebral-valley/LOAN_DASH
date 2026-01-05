@@ -2,14 +2,36 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Loan } from '../entities/Loan';
 import { stringify } from 'csv-stringify/sync';
+import { cache } from '../utils/cache';
 
 export class LoanController {
   private loanRepository = AppDataSource.getRepository(Loan);
 
   getAllLoans = async (req: Request, res: Response) => {
     try {
-      const loans = await this.loanRepository.find();
-      res.json(loans);
+      // Add pagination support
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const skip = (page - 1) * limit;
+
+      // Get total count for pagination metadata
+      const [loans, total] = await this.loanRepository.findAndCount({
+        skip,
+        take: limit,
+        order: {
+          loan_number: 'DESC',
+        },
+      });
+
+      res.json({
+        data: loans,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       console.error('Error fetching loans:', error);
       res.status(500).json({ error: 'Failed to fetch loans' });
@@ -36,13 +58,30 @@ export class LoanController {
 
   getActiveLoans = async (req: Request, res: Response) => {
     try {
-      const loans = await this.loanRepository
+      // Add pagination support
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const skip = (page - 1) * limit;
+
+      const queryBuilder = this.loanRepository
         .createQueryBuilder('loan')
         .where("loan.released != 'TRUE'")
         .orWhere('loan.released IS NULL')
-        .getMany();
+        .orderBy('loan.loan_number', 'DESC')
+        .skip(skip)
+        .take(limit);
 
-      res.json(loans);
+      const [loans, total] = await queryBuilder.getManyAndCount();
+
+      res.json({
+        data: loans,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       console.error('Error fetching active loans:', error);
       res.status(500).json({ error: 'Failed to fetch active loans' });
@@ -51,12 +90,29 @@ export class LoanController {
 
   getReleasedLoans = async (req: Request, res: Response) => {
     try {
-      const loans = await this.loanRepository
+      // Add pagination support
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const skip = (page - 1) * limit;
+
+      const queryBuilder = this.loanRepository
         .createQueryBuilder('loan')
         .where("loan.released = 'TRUE'")
-        .getMany();
+        .orderBy('loan.loan_number', 'DESC')
+        .skip(skip)
+        .take(limit);
 
-      res.json(loans);
+      const [loans, total] = await queryBuilder.getManyAndCount();
+
+      res.json({
+        data: loans,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       console.error('Error fetching released loans:', error);
       res.status(500).json({ error: 'Failed to fetch released loans' });
@@ -66,11 +122,29 @@ export class LoanController {
   getLoansByCustomerType = async (req: Request, res: Response) => {
     try {
       const { type } = req.params;
-      const loans = await this.loanRepository.find({
+      // Add pagination support
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const skip = (page - 1) * limit;
+
+      const [loans, total] = await this.loanRepository.findAndCount({
         where: { customer_type: type },
+        skip,
+        take: limit,
+        order: {
+          loan_number: 'DESC',
+        },
       });
 
-      res.json(loans);
+      res.json({
+        data: loans,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       console.error('Error fetching loans by customer type:', error);
       res.status(500).json({ error: 'Failed to fetch loans by customer type' });
@@ -97,36 +171,39 @@ export class LoanController {
 
   getLoanStats = async (req: Request, res: Response) => {
     try {
-      const totalLoans = await this.loanRepository.count();
-      const activeLoans = await this.loanRepository
-        .createQueryBuilder('loan')
-        .where("loan.released != 'TRUE'")
-        .orWhere('loan.released IS NULL')
-        .getCount();
+      // Check cache first
+      const cacheKey = 'loan_stats';
+      const cachedStats = cache.get(cacheKey);
+      if (cachedStats) {
+        return res.json(cachedStats);
+      }
 
-      const totalDisbursed = await this.loanRepository
+      // Use a single aggregated query instead of 5 separate queries
+      const stats = await this.loanRepository
         .createQueryBuilder('loan')
-        .select('SUM(loan.loan_amount)', 'total')
+        .select('COUNT(*)', 'totalLoans')
+        .addSelect(
+          "SUM(CASE WHEN loan.released != 'TRUE' OR loan.released IS NULL THEN 1 ELSE 0 END)",
+          'activeLoans'
+        )
+        .addSelect('SUM(loan.loan_amount)', 'totalDisbursed')
+        .addSelect('SUM(loan.pending_loan_amount)', 'totalOutstanding')
+        .addSelect('SUM(loan.interest_deposited_till_date)', 'totalInterestReceived')
         .getRawOne();
 
-      const totalOutstanding = await this.loanRepository
-        .createQueryBuilder('loan')
-        .select('SUM(loan.pending_loan_amount)', 'total')
-        .getRawOne();
+      const result = {
+        totalLoans: parseInt(stats.totalLoans) || 0,
+        activeLoans: parseInt(stats.activeLoans) || 0,
+        releasedLoans: (parseInt(stats.totalLoans) || 0) - (parseInt(stats.activeLoans) || 0),
+        totalDisbursed: parseFloat(stats.totalDisbursed) || 0,
+        totalOutstanding: parseFloat(stats.totalOutstanding) || 0,
+        totalInterestReceived: parseFloat(stats.totalInterestReceived) || 0,
+      };
 
-      const totalInterestReceived = await this.loanRepository
-        .createQueryBuilder('loan')
-        .select('SUM(loan.interest_deposited_till_date)', 'total')
-        .getRawOne();
+      // Store in cache
+      cache.set(cacheKey, result);
 
-      res.json({
-        totalLoans,
-        activeLoans,
-        releasedLoans: totalLoans - activeLoans,
-        totalDisbursed: parseFloat(totalDisbursed.total) || 0,
-        totalOutstanding: parseFloat(totalOutstanding.total) || 0,
-        totalInterestReceived: parseFloat(totalInterestReceived.total) || 0,
-      });
+      res.json(result);
     } catch (error) {
       console.error('Error fetching loan stats:', error);
       res.status(500).json({ error: 'Failed to fetch loan stats' });
@@ -154,13 +231,29 @@ export class LoanController {
   getLoansByCustomer = async (req: Request, res: Response) => {
     try {
       const { customerName } = req.params;
-      const loans = await this.loanRepository
+      // Add pagination support
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const skip = (page - 1) * limit;
+
+      const queryBuilder = this.loanRepository
         .createQueryBuilder('loan')
         .where('loan.customer_name = :customerName', { customerName })
         .orderBy('loan.date_of_disbursement', 'DESC')
-        .getMany();
+        .skip(skip)
+        .take(limit);
 
-      res.json(loans);
+      const [loans, total] = await queryBuilder.getManyAndCount();
+
+      res.json({
+        data: loans,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       console.error('Error fetching loans by customer:', error);
       res.status(500).json({ error: 'Failed to fetch loans by customer' });
@@ -169,39 +262,62 @@ export class LoanController {
 
   getOverviewStats = async (req: Request, res: Response) => {
     try {
-      const loans = await this.loanRepository.find();
+      // Check cache first
+      const cacheKey = 'overview_stats';
+      const cachedStats = cache.get(cacheKey);
+      if (cachedStats) {
+        return res.json(cachedStats);
+      }
 
-      // Calculate cumulative metrics
-      const totalDisbursed = loans.reduce((sum, loan) => sum + (parseFloat(String(loan.loan_amount)) || 0), 0);
-      const totalOutstanding = loans
-        .filter((loan) => loan.released !== 'TRUE')
-        .reduce((sum, loan) => sum + (parseFloat(String(loan.pending_loan_amount)) || 0), 0);
-      const totalInterestReceived = loans.reduce(
-        (sum, loan) => sum + (parseFloat(String(loan.interest_deposited_till_date)) || 0),
-        0
-      );
+      // Use database aggregation instead of loading all records into memory
+      const stats = await this.loanRepository
+        .createQueryBuilder('loan')
+        .select('SUM(loan.loan_amount)', 'totalDisbursed')
+        .addSelect('SUM(loan.interest_deposited_till_date)', 'totalInterestReceived')
+        .addSelect('COUNT(*)', 'totalLoans')
+        .addSelect(
+          "SUM(CASE WHEN loan.released != 'TRUE' OR loan.released IS NULL THEN 1 ELSE 0 END)",
+          'activeLoans'
+        )
+        .addSelect(
+          "SUM(CASE WHEN loan.released != 'TRUE' OR loan.released IS NULL THEN loan.pending_loan_amount ELSE 0 END)",
+          'totalOutstanding'
+        )
+        .getRawOne();
 
-      // Group by date for time series
-      const loansByDate = loans.reduce((acc: any, loan) => {
-        const date = loan.date_of_disbursement?.toString().split('T')[0];
-        if (date) {
-          if (!acc[date]) {
-            acc[date] = { disbursed: 0, count: 0 };
-          }
-          acc[date].disbursed += parseFloat(String(loan.loan_amount)) || 0;
-          acc[date].count += 1;
-        }
+      // Get loans grouped by date for time series
+      const loansByDate = await this.loanRepository
+        .createQueryBuilder('loan')
+        .select('DATE(loan.date_of_disbursement)', 'date')
+        .addSelect('SUM(loan.loan_amount)', 'disbursed')
+        .addSelect('COUNT(*)', 'count')
+        .where('loan.date_of_disbursement IS NOT NULL')
+        .groupBy('DATE(loan.date_of_disbursement)')
+        .orderBy('DATE(loan.date_of_disbursement)', 'ASC')
+        .getRawMany();
+
+      // Transform to object format
+      const loansByDateObj = loansByDate.reduce((acc: any, row) => {
+        acc[row.date] = {
+          disbursed: parseFloat(row.disbursed) || 0,
+          count: parseInt(row.count) || 0,
+        };
         return acc;
       }, {});
 
-      res.json({
-        totalDisbursed,
-        totalOutstanding,
-        totalInterestReceived,
-        totalLoans: loans.length,
-        activeLoans: loans.filter((loan) => loan.released !== 'TRUE').length,
-        loansByDate,
-      });
+      const result = {
+        totalDisbursed: parseFloat(stats.totalDisbursed) || 0,
+        totalOutstanding: parseFloat(stats.totalOutstanding) || 0,
+        totalInterestReceived: parseFloat(stats.totalInterestReceived) || 0,
+        totalLoans: parseInt(stats.totalLoans) || 0,
+        activeLoans: parseInt(stats.activeLoans) || 0,
+        loansByDate: loansByDateObj,
+      };
+
+      // Store in cache
+      cache.set(cacheKey, result);
+
+      res.json(result);
     } catch (error) {
       console.error('Error fetching overview stats:', error);
       res.status(500).json({ error: 'Failed to fetch overview stats' });
