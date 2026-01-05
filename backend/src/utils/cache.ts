@@ -1,6 +1,10 @@
 /**
  * Simple in-memory cache for expensive operations
  * Cache entries expire after a configurable TTL
+ * 
+ * Note: This is a simple in-memory cache suitable for single-instance deployments.
+ * For multi-instance deployments with high concurrency, consider using a
+ * proven caching library like `node-cache` or a distributed cache like Redis.
  */
 
 interface CacheEntry<T> {

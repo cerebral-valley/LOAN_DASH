@@ -9,9 +9,9 @@ export class LoanController {
 
   getAllLoans = async (req: Request, res: Response) => {
     try {
-      // Add pagination support
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
       const skip = (page - 1) * limit;
 
       // Get total count for pagination metadata
@@ -58,9 +58,9 @@ export class LoanController {
 
   getActiveLoans = async (req: Request, res: Response) => {
     try {
-      // Add pagination support
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
       const skip = (page - 1) * limit;
 
       const queryBuilder = this.loanRepository
@@ -90,9 +90,9 @@ export class LoanController {
 
   getReleasedLoans = async (req: Request, res: Response) => {
     try {
-      // Add pagination support
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
       const skip = (page - 1) * limit;
 
       const queryBuilder = this.loanRepository
@@ -122,9 +122,9 @@ export class LoanController {
   getLoansByCustomerType = async (req: Request, res: Response) => {
     try {
       const { type } = req.params;
-      // Add pagination support
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
       const skip = (page - 1) * limit;
 
       const [loans, total] = await this.loanRepository.findAndCount({
@@ -231,9 +231,9 @@ export class LoanController {
   getLoansByCustomer = async (req: Request, res: Response) => {
     try {
       const { customerName } = req.params;
-      // Add pagination support
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
       const skip = (page - 1) * limit;
 
       const queryBuilder = this.loanRepository

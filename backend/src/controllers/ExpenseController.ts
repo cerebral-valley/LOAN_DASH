@@ -9,9 +9,9 @@ export class ExpenseController {
 
   getAllExpenses = async (req: Request, res: Response) => {
     try {
-      // Add pagination support
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
       const skip = (page - 1) * limit;
 
       const [expenses, total] = await this.expenseRepository.findAndCount({

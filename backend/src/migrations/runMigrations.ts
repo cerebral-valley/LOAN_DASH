@@ -5,6 +5,9 @@ import { AppDataSource } from '../config/database';
 /**
  * Run database migrations
  * This function reads and executes SQL migration files
+ * 
+ * Security Note: Migration files are trusted application code.
+ * They are not user-controlled and are executed as-is from the filesystem.
  */
 export async function runMigrations() {
   try {
