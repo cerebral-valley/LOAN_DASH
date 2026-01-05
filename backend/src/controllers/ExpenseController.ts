@@ -2,16 +2,33 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { ExpenseTracker } from '../entities/ExpenseTracker';
 import { stringify } from 'csv-stringify/sync';
+import { cache } from '../utils/cache';
 
 export class ExpenseController {
   private expenseRepository = AppDataSource.getRepository(ExpenseTracker);
 
   getAllExpenses = async (req: Request, res: Response) => {
     try {
-      const expenses = await this.expenseRepository.find({
+      // Add pagination support with validation
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
+      const skip = (page - 1) * limit;
+
+      const [expenses, total] = await this.expenseRepository.findAndCount({
         order: { date: 'DESC' },
+        skip,
+        take: limit,
       });
-      res.json(expenses);
+
+      res.json({
+        data: expenses,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       console.error('Error fetching expenses:', error);
       res.status(500).json({ error: 'Failed to fetch expenses' });
@@ -58,31 +75,33 @@ export class ExpenseController {
 
   getExpenseStats = async (req: Request, res: Response) => {
     try {
-      const totalExpenses = await this.expenseRepository.count();
+      // Check cache first
+      const cacheKey = 'expense_stats';
+      const cachedStats = cache.get(cacheKey);
+      if (cachedStats) {
+        return res.json(cachedStats);
+      }
 
-      const totalAmount = await this.expenseRepository
+      // Use single aggregated query instead of multiple queries
+      const stats = await this.expenseRepository
         .createQueryBuilder('expense')
-        .select('SUM(expense.amount)', 'total')
+        .select('COUNT(*)', 'totalExpenses')
+        .addSelect('SUM(expense.amount)', 'totalAmount')
+        .addSelect("SUM(CASE WHEN expense.payment_mode = 'cash' THEN expense.amount ELSE 0 END)", 'cashExpenses')
+        .addSelect("SUM(CASE WHEN expense.payment_mode = 'bank' THEN expense.amount ELSE 0 END)", 'bankExpenses')
         .getRawOne();
 
-      const cashExpenses = await this.expenseRepository
-        .createQueryBuilder('expense')
-        .select('SUM(expense.amount)', 'total')
-        .where("expense.payment_mode = 'cash'")
-        .getRawOne();
+      const result = {
+        totalExpenses: parseInt(stats.totalExpenses) || 0,
+        totalAmount: parseFloat(stats.totalAmount) || 0,
+        cashExpenses: parseFloat(stats.cashExpenses) || 0,
+        bankExpenses: parseFloat(stats.bankExpenses) || 0,
+      };
 
-      const bankExpenses = await this.expenseRepository
-        .createQueryBuilder('expense')
-        .select('SUM(expense.amount)', 'total')
-        .where("expense.payment_mode = 'bank'")
-        .getRawOne();
+      // Store in cache
+      cache.set(cacheKey, result);
 
-      res.json({
-        totalExpenses,
-        totalAmount: parseFloat(totalAmount.total) || 0,
-        cashExpenses: parseFloat(cashExpenses.total) || 0,
-        bankExpenses: parseFloat(bankExpenses.total) || 0,
-      });
+      res.json(result);
     } catch (error) {
       console.error('Error fetching expense stats:', error);
       res.status(500).json({ error: 'Failed to fetch expense stats' });
