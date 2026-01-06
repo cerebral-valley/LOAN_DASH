@@ -38,7 +38,10 @@ export default function PortfolioPage() {
       }
       acc[type].count++;
       acc[type].totalAmount += loan.loan_amount || 0;
-      acc[type].totalOutstanding += loan.pending_loan_amount || 0;
+      // Only add outstanding for active loans (released = FALSE)
+      if (loan.released !== 'TRUE') {
+        acc[type].totalOutstanding += loan.pending_loan_amount || 0;
+      }
       return acc;
     }, {} as Record<string, { count: number; totalAmount: number; totalOutstanding: number }>);
 
@@ -172,7 +175,7 @@ export default function PortfolioPage() {
                       ₹{data.totalAmount.toLocaleString('en-IN')}
                     </TableCell>
                     <TableCell className="text-right">
-                      ₹{data.totalOutstanding.toLocaleString('en-IN')}
+                      ₹{Math.round(data.totalOutstanding).toLocaleString('en-IN')}
                     </TableCell>
                   </TableRow>
                 ))}

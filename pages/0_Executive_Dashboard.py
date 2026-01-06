@@ -234,7 +234,11 @@ try:
     total_interest = current_period_df['interest_amount'].sum()
     loan_count = len(current_period_df)
     active_loans = len(filtered_df[filtered_df['released'] == 'FALSE'])
-    avg_loan_size = current_period_df['loan_amount'].mean() if loan_count > 0 else 0
+    # Average Loan Amount calculated on released loans (released = TRUE)
+    released_loans_df = filtered_df[filtered_df['released'] == 'TRUE']
+    avg_loan_size = released_loans_df['loan_amount'].mean() if len(released_loans_df) > 0 else 0
+    # Also calculate median loan amount for released loans
+    median_loan_size = released_loans_df['loan_amount'].median() if len(released_loans_df) > 0 else 0
     active_customers = filtered_df[filtered_df['released'] == 'FALSE']['customer_name'].nunique()
     
     # Calculate previous period metrics
@@ -276,70 +280,27 @@ try:
         st.caption(f"{loan_count} new in period")
     
     with col3:
-        # Interest Earned Calculation - Fixed Start Date: March 1, 2020
-        # Always calculate from March 1, 2020 to current period end
-        fixed_start_date = pd.Timestamp('2020-03-01')
+        # Interest Received Calculation - Correct Formula
+        # For released = true: interest_amount
+        # For released <> true: interest_deposited_till_date
         
-        # Get all released loans from March 1, 2020 to period end
-        released_in_period = filtered_df[
-            (filtered_df['date_of_release'] >= fixed_start_date) &
-            (filtered_df['date_of_release'] <= period_end) &
-            (filtered_df['released'] == 'TRUE')
-        ].copy()
-        
-        # For released loans: Use higher of interest_amount or interest_deposited_till_date
-        if not released_in_period.empty:
-            released_in_period['legacy_interest'] = released_in_period.apply(
-                lambda row: max(row['interest_amount'], row['interest_deposited_till_date']),
-                axis=1
-            )
-            interest_from_released = released_in_period['legacy_interest'].sum()
-        else:
-            interest_from_released = 0
+        # For released loans: Use interest_amount
+        released_loans = filtered_df[filtered_df['released'] == 'TRUE'].copy()
+        interest_from_released = released_loans['interest_amount'].sum()
         
         # For active loans (released = FALSE): Use interest_deposited_till_date
-        active_with_interest = filtered_df[
-            (filtered_df['released'] == 'FALSE') &
-            (filtered_df['interest_deposited_till_date'] > 0)
-        ].copy()
-        
-        interest_from_active = active_with_interest['interest_deposited_till_date'].sum()
+        active_loans = filtered_df[filtered_df['released'] == 'FALSE'].copy()
+        interest_from_active = active_loans['interest_deposited_till_date'].sum()
         
         # Total interest = Released + Active deposits
         total_interest = interest_from_released + interest_from_active
         
-        # Previous period calculation (same logic for comparison)
-        prev_released = filtered_df[
-            (filtered_df['date_of_release'] >= fixed_start_date) &
-            (filtered_df['date_of_release'] <= prev_period_end) &
-            (filtered_df['released'] == 'TRUE')
-        ].copy()
-        
-        if not prev_released.empty:
-            prev_released['legacy_interest'] = prev_released.apply(
-                lambda row: max(row['interest_amount'], row['interest_deposited_till_date']),
-                axis=1
-            )
-            prev_interest_from_released = prev_released['legacy_interest'].sum()
-        else:
-            prev_interest_from_released = 0
-        
-        prev_active_with_interest = filtered_df[
-            (filtered_df['released'] == 'FALSE') &
-            (filtered_df['interest_deposited_till_date'] > 0)
-        ].copy()
-        
-        prev_interest_from_active = prev_active_with_interest['interest_deposited_till_date'].sum()
-        prev_interest = prev_interest_from_released + prev_interest_from_active
-        
-        interest_growth = ((total_interest - prev_interest) / prev_interest * 100) if prev_interest > 0 else 0
-        
         collection_rate = (total_interest / (total_disbursed * 0.12) * 100) if total_disbursed > 0 else 0
         st.metric(
-            "💵 Interest Earned",
+            "💵 Interest Received",
             f"₹{total_interest/1_000:.0f}K",
-            f"{interest_growth:+.1f}%" if compare_previous else None,
-            delta_color="normal" if interest_growth >= 0 else "inverse"
+            None,  # No period comparison for cumulative interest
+            delta_color="normal"
         )
         st.caption(f"Collection: {collection_rate:.1f}%")
 
@@ -351,7 +312,7 @@ try:
             f"₹{portfolio_value/1_000_000:.2f}M",
             f"{active_customers} active customers"
         )
-        st.caption(f"Avg: ₹{avg_loan_size:,.0f}")
+        st.caption(f"Avg: ₹{avg_loan_size:,.0f} | Median: ₹{median_loan_size:,.0f}")
     
     # ========================================
     # PORTFOLIO HEALTH SCORE
@@ -966,12 +927,12 @@ try:
         st.markdown("### Interest Earnings Analysis")
         
         # Filter for released loans (interest is realized on release)
-        interest_df = filtered_df[filtered_df['date_of_release'].notna()].copy()
+        interest_df = filtered_df[filtered_df['released'] == 'TRUE'].copy()
         
         # Calculate realized_interest using correct formula
+        # For released loans: use interest_amount
         if not interest_df.empty:
-            from db import calculate_realized_interest
-            interest_df['realized_interest'] = calculate_realized_interest(interest_df)
+            interest_df['realized_interest'] = interest_df['interest_amount']
         
         if not interest_df.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -989,7 +950,7 @@ try:
                 total_interest_all = interest_df['realized_interest'].sum()
                 total_principal = interest_df['loan_amount'].sum()
                 avg_roi = (total_interest_all / total_principal * 100) if total_principal > 0 else 0
-                st.metric("Average ROI", f"{avg_roi:.2f}%")
+                st.metric("Interest to Principal Ratio", f"{avg_roi:.2f}%")
             
             with col4:
                 # Average Daily Interest = Total Realized Interest / Days from March 1, 2020 to Today

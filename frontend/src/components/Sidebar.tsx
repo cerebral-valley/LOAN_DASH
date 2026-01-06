@@ -34,11 +34,6 @@ const navigation = [
     badge: 'New',
   },
   {
-    name: 'Overview',
-    href: '/overview',
-    icon: FileText,
-  },
-  {
     name: 'Yearly Breakdown',
     href: '/yearly',
     icon: Calendar,
@@ -110,11 +105,6 @@ const newPages = [
     name: 'Aging Analysis',
     href: '/aging',
     icon: TrendingDown,
-  },
-  {
-    name: 'Payment History',
-    href: '/payment-history',
-    icon: Target,
   },
   {
     name: 'LTV Trends',

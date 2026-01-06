@@ -120,8 +120,22 @@ weighted_avg_days = (yield_df['loan_amount'] * yield_df['days_to_release']).sum(
 # Portfolio annualized yield (PRIMARY METRIC)
 portfolio_yield = (total_interest / total_capital) * (365 / weighted_avg_days) * 100
 
-# Simple return (not annualized)
-simple_return = (total_interest / total_capital) * 100
+# Simple return (not annualized) - for trailing 12 months
+# Filter for loans released in the last 12 months
+today = pd.Timestamp.now()
+twelve_months_ago = today - relativedelta(months=12)
+trailing_12m = yield_df[yield_df['date_of_release'] >= twelve_months_ago].copy()
+
+if not trailing_12m.empty:
+    # Use interest_amount for released loans as per correct formula
+    simple_return_interest = trailing_12m['interest_amount'].sum()
+    simple_return_principal = trailing_12m['loan_amount'].sum()
+    simple_return = (simple_return_interest / simple_return_principal * 100) if simple_return_principal > 0 else 0
+else:
+    simple_return = 0
+
+# Avg Holding = simple average of days_to_release for all released loans
+avg_holding_days = yield_df['days_to_release'].mean()
 
 # Display metrics
 col1, col2, col3, col4, col5 = st.columns(5)
@@ -138,9 +152,9 @@ with col2:
     st.metric(
         "Simple Return",
         f"{simple_return:.2f}%",
-        help="Actual return earned (not annualized): (Total Interest / Total Capital) × 100"
+        help="Actual return earned for trailing 12 months (not annualized): (Sum of interest_amount / Sum of loan_amount) × 100"
     )
-    st.caption("💰 Actual Return")
+    st.caption("💰 Trailing 12M")
 
 with col3:
     st.metric(
@@ -161,10 +175,10 @@ with col4:
 with col5:
     st.metric(
         "Avg Holding",
-        f"{weighted_avg_days:.0f} days",
-        help="Capital-weighted average holding period across all loans"
+        f"{avg_holding_days:.0f} days",
+        help="Simple average of (date_of_release - date_of_disbursement) for all released loans"
     )
-    st.caption("⏱️ Weighted Avg")
+    st.caption("⏱️ Simple Avg")
 
 st.markdown("---")
 

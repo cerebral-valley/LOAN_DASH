@@ -28,11 +28,14 @@ export default function ClientsPage() {
   const { data: loans = [], isLoading, error, refetch } = useLoans();
   const { download: downloadCSV } = useDownloadLoanCSV();
 
-  // Calculate customer type aggregates
+  // Calculate customer type aggregates for active loans (released = FALSE)
   const customerTypeData = useMemo((): CustomerTypeData[] => {
     if (!loans || loans.length === 0) return [];
 
-    const normalizedLoans = loans.map((loan) => ({
+    // Filter for active loans only (released = FALSE)
+    const activeLoans = loans.filter(loan => loan.released !== 'TRUE');
+
+    const normalizedLoans = activeLoans.map((loan) => ({
       ...loan,
       normalizedType: loan.customer_type?.toUpperCase().trim() === 'VYAPARI' ? 'Vyapari' : 'Private',
     }));
