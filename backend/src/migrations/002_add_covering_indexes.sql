@@ -2,7 +2,7 @@
 -- Covering indexes include both WHERE and SELECT columns for optimal performance
 
 -- Covering index for stats query (includes all aggregation columns)
-CREATE INDEX IF NOT EXISTS idx_stats_covering ON loan_table(
+CREATE INDEX idx_stats_covering ON loan_table(
   released, 
   loan_amount, 
   pending_loan_amount, 
@@ -10,7 +10,7 @@ CREATE INDEX IF NOT EXISTS idx_stats_covering ON loan_table(
 );
 
 -- Covering index for customer queries (includes commonly selected columns)
-CREATE INDEX IF NOT EXISTS idx_customer_covering ON loan_table(
+CREATE INDEX idx_customer_covering ON loan_table(
   customer_name,
   loan_number,
   released,
@@ -21,7 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_customer_covering ON loan_table(
 );
 
 -- Covering index for customer type queries
-CREATE INDEX IF NOT EXISTS idx_customer_type_covering ON loan_table(
+CREATE INDEX idx_customer_type_covering ON loan_table(
   customer_type,
   loan_number,
   released,
@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_customer_type_covering ON loan_table(
 );
 
 -- Covering index for active loans with common display fields
-CREATE INDEX IF NOT EXISTS idx_active_loans_covering ON loan_table(
+CREATE INDEX idx_active_loans_covering ON loan_table(
   released,
   loan_number,
   customer_name,
@@ -40,11 +40,11 @@ CREATE INDEX IF NOT EXISTS idx_active_loans_covering ON loan_table(
 );
 
 -- Add index on expense_tracker for common queries
-CREATE INDEX IF NOT EXISTS idx_expense_date ON expense_tracker(date);
-CREATE INDEX IF NOT EXISTS idx_expense_payment_mode ON expense_tracker(payment_mode);
+CREATE INDEX idx_expense_date ON expense_tracker(date);
+CREATE INDEX idx_expense_payment_mode ON expense_tracker(payment_mode);
 
 -- Covering index for expense stats query
-CREATE INDEX IF NOT EXISTS idx_expense_stats_covering ON expense_tracker(
+CREATE INDEX idx_expense_stats_covering ON expense_tracker(
   payment_mode,
   amount
 );
