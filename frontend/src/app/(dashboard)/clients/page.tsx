@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { useDownloadLoanCSV } from '@/lib/hooks';
 import { Download, Users, PieChart } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface CustomerTypeData {
   type: string;
@@ -22,116 +25,80 @@ interface YearlyCustomerData {
 }
 
 export default function ClientsPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [customerTypeData, setCustomerTypeData] = useState<CustomerTypeData[]>([]);
-  const [yearlyData, setYearlyData] = useState<YearlyCustomerData>({});
-  const [years, setYears] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { download: downloadCSV } = useDownloadLoanCSV();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Calculate customer type aggregates
+  const customerTypeData = useMemo((): CustomerTypeData[] => {
+    if (!loans || loans.length === 0) return [];
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getAll();
-      const loansData = response.data;
-      setLoans(loansData);
+    const normalizedLoans = loans.map((loan) => ({
+      ...loan,
+      normalizedType: loan.customer_type?.toUpperCase().trim() === 'VYAPARI' ? 'Vyapari' : 'Private',
+    }));
 
-      // Normalize customer type
-      const normalizedLoans = loansData.map((loan) => ({
-        ...loan,
-        normalizedType: loan.customer_type?.toUpperCase().trim() === 'VYAPARI' ? 'Vyapari' : 'Private',
-      }));
+    const typeMap: Record<string, { amount: number; count: number }> = {};
+    
+    normalizedLoans.forEach((loan) => {
+      const type = loan.normalizedType;
+      if (!typeMap[type]) {
+        typeMap[type] = { amount: 0, count: 0 };
+      }
+      typeMap[type].amount += loan.loan_amount || 0;
+      typeMap[type].count += 1;
+    });
 
-      // Calculate customer type aggregates
-      const typeMap: Record<string, { amount: number; count: number }> = {};
-      
-      normalizedLoans.forEach((loan) => {
-        const type = loan.normalizedType;
-        if (!typeMap[type]) {
-          typeMap[type] = { amount: 0, count: 0 };
+    return Object.entries(typeMap).map(([type, data]) => ({
+      type,
+      totalAmount: data.amount,
+      totalCount: data.count,
+      averageAmount: data.count > 0 ? data.amount / data.count : 0,
+    }));
+  }, [loans]);
+
+  // Calculate yearly breakdown by customer type
+  const { yearlyData, years } = useMemo(() => {
+    if (!loans || loans.length === 0) return { yearlyData: {}, years: [] };
+
+    const normalizedLoans = loans.map((loan) => ({
+      ...loan,
+      normalizedType: loan.customer_type?.toUpperCase().trim() === 'VYAPARI' ? 'Vyapari' : 'Private',
+    }));
+
+    const yearlyMap: YearlyCustomerData = {};
+    const yearSet = new Set<string>();
+
+    normalizedLoans.forEach((loan) => {
+      if (loan.date_of_disbursement) {
+        const year = new Date(loan.date_of_disbursement).getFullYear().toString();
+        yearSet.add(year);
+
+        if (!yearlyMap[year]) {
+          yearlyMap[year] = { Private: 0, Vyapari: 0 };
         }
-        typeMap[type].amount += loan.loan_amount || 0;
-        typeMap[type].count += 1;
-      });
 
-      const typeData: CustomerTypeData[] = Object.entries(typeMap).map(([type, data]) => ({
-        type,
-        totalAmount: data.amount,
-        totalCount: data.count,
-        averageAmount: data.count > 0 ? data.amount / data.count : 0,
-      }));
+        const type = loan.normalizedType as 'Private' | 'Vyapari';
+        yearlyMap[year][type] += loan.loan_amount || 0;
+      }
+    });
 
-      setCustomerTypeData(typeData);
-
-      // Calculate yearly breakdown by customer type
-      const yearlyMap: YearlyCustomerData = {};
-      const yearSet = new Set<string>();
-
-      normalizedLoans.forEach((loan) => {
-        if (loan.date_of_disbursement) {
-          const year = new Date(loan.date_of_disbursement).getFullYear().toString();
-          yearSet.add(year);
-
-          if (!yearlyMap[year]) {
-            yearlyMap[year] = { Private: 0, Vyapari: 0 };
-          }
-
-          const type = loan.normalizedType as 'Private' | 'Vyapari';
-          yearlyMap[year][type] += loan.loan_amount || 0;
-        }
-      });
-
-      setYearlyData(yearlyMap);
-      setYears(Array.from(yearSet).sort());
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadCSV = async () => {
-    try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'client-wise-analysis.csv');
-    } catch (err) {
-      console.error('Error downloading CSV:', err);
-    }
-  };
+    return {
+      yearlyData: yearlyMap,
+      years: Array.from(yearSet).sort(),
+    };
+  }, [loans]);
 
   const calculatePercentage = (amount: number) => {
     const total = customerTypeData.reduce((sum, item) => sum + item.totalAmount, 0);
     return total > 0 ? ((amount / total) * 100).toFixed(1) : '0.0';
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading client-wise analysis...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -143,7 +110,7 @@ export default function ClientsPage() {
             Loan analysis by customer type (Private vs Vyapari)
           </p>
         </div>
-        <Button onClick={handleDownloadCSV} variant="outline">
+        <Button onClick={() => downloadCSV('client-wise-analysis.csv')} variant="outline">
           <Download className="mr-2 h-4 w-4" />
           Export CSV
         </Button>

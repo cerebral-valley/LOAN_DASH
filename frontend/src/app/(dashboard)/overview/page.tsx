@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { useDownloadLoanCSV } from '@/lib/hooks';
 import { Download, TrendingUp, TrendingDown, DollarSign, Activity, FileText } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface AggregatedStats {
   totalDisbursedAmount: number;
@@ -18,95 +21,51 @@ interface AggregatedStats {
 }
 
 export default function OverviewPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [stats, setStats] = useState<AggregatedStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { download: downloadCSV } = useDownloadLoanCSV();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Calculate statistics from loans data
+  const stats = useMemo((): AggregatedStats | null => {
+    if (!loans || loans.length === 0) return null;
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getAll();
-      const loansData = response.data;
-      setLoans(loansData);
-
-      // Calculate statistics
-      const totalDisbursedAmount = loansData.reduce(
-        (sum, loan) => sum + (loan.loan_amount || 0),
-        0
-      );
-      
-      const activeLoansData = loansData.filter(loan => loan.released !== 'TRUE');
-      const totalOutstanding = activeLoansData.reduce(
-        (sum, loan) => sum + (loan.pending_loan_amount || 0),
-        0
-      );
-      
-      const totalInterestReceived = loansData.reduce(
-        (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
-        0
-      );
-
-      const calculatedStats: AggregatedStats = {
-        totalDisbursedAmount,
-        totalOutstanding,
-        totalInterestReceived,
-        totalLoans: loansData.length,
-        activeLoans: activeLoansData.length,
-        averageLoanSize: loansData.length > 0 ? totalDisbursedAmount / loansData.length : 0,
-        collectionRate: totalDisbursedAmount > 0 
-          ? ((totalDisbursedAmount - totalOutstanding) / totalDisbursedAmount) * 100 
-          : 0,
-        interestToPrincipalRatio: totalDisbursedAmount > 0 
-          ? (totalInterestReceived / totalDisbursedAmount) * 100 
-          : 0,
-      };
-
-      setStats(calculatedStats);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadCSV = async () => {
-    try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'overview-loans.csv');
-    } catch (err) {
-      console.error('Error downloading CSV:', err);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading overview data...</div>
-      </div>
+    const totalDisbursedAmount = loans.reduce(
+      (sum, loan) => sum + (loan.loan_amount || 0),
+      0
     );
+    
+    const activeLoansData = loans.filter(loan => loan.released !== 'TRUE');
+    const totalOutstanding = activeLoansData.reduce(
+      (sum, loan) => sum + (loan.pending_loan_amount || 0),
+      0
+    );
+    
+    const totalInterestReceived = loans.reduce(
+      (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
+      0
+    );
+
+    return {
+      totalDisbursedAmount,
+      totalOutstanding,
+      totalInterestReceived,
+      totalLoans: loans.length,
+      activeLoans: activeLoansData.length,
+      averageLoanSize: loans.length > 0 ? totalDisbursedAmount / loans.length : 0,
+      collectionRate: totalDisbursedAmount > 0 
+        ? ((totalDisbursedAmount - totalOutstanding) / totalDisbursedAmount) * 100 
+        : 0,
+      interestToPrincipalRatio: totalDisbursedAmount > 0 
+        ? (totalInterestReceived / totalDisbursedAmount) * 100 
+        : 0,
+    };
+  }, [loans]);
+
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -118,7 +77,7 @@ export default function OverviewPage() {
             Comprehensive loan portfolio overview with key performance indicators
           </p>
         </div>
-        <Button onClick={handleDownloadCSV} variant="outline">
+        <Button onClick={() => downloadCSV('overview-loans.csv')} variant="outline">
           <Download className="mr-2 h-4 w-4" />
           Export CSV
         </Button>
