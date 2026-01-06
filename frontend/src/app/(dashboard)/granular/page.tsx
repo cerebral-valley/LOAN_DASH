@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, VyapariCustomer } from '@/lib/api';
+import { loanApi, Loan, VyapariCustomer, downloadCSV } from '@/lib/api';
 import { Download, Search, Filter } from 'lucide-react';
 import { extractUniqueYears, filterLoansByCustomerType, filterLoansByCustomer } from '@/lib/loan-utils';
 import { sumLoanAmounts, sumOutstanding, calculateAverageAmount } from '@/lib/aggregation-utils';
 import { formatCurrency, formatDate } from '@/lib/formatting-utils';
-import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 
@@ -124,7 +123,7 @@ export default function GranularPage() {
   const handleDownloadCSV = async () => {
     try {
       const response = await loanApi.downloadCSV();
-      exportToCSV(response.data, 'granular-analysis.csv');
+      downloadCSV(response.data, 'granular-analysis.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }

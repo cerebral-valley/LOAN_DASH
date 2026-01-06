@@ -3,11 +3,10 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loanApi } from '@/lib/api';
+import { loanApi, downloadCSV } from '@/lib/api';
 import { useLoanStats } from '@/lib/queries';
 import { Download, TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
 import { formatCurrency, formatPercentage } from '@/lib/formatting-utils';
-import { exportToCSV } from '@/lib/csv-utils';
 import { calculateCollectionRate, calculateInterestToPrincipalRatio } from '@/lib/aggregation-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
@@ -18,7 +17,7 @@ export default function DashboardPage() {
   const handleDownloadCSV = async () => {
     try {
       const response = await loanApi.downloadCSV();
-      exportToCSV(response.data, 'loans.csv');
+      downloadCSV(response.data, 'loans.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
