@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
+import { loanApi } from '@/lib/api';
 import { Download, Lightbulb, AlertCircle, TrendingUp, Users, DollarSign, Target } from 'lucide-react';
 
 interface Recommendation {

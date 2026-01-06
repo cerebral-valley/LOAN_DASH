@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,31 +43,16 @@ const MOCK_GOLD_SILVER_RATES: GoldSilverRate[] = [
 export default function RatesPage() {
   const [rates, setRates] = useState<GoldSilverRate[]>([]);
   const [latestRate, setLatestRate] = useState<GoldSilverRate | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
+  useMemo(() => {
+    // Mock data since we don't have a backend endpoint for this yet
+    // In production, this would call an API endpoint
+    const mockRates = MOCK_GOLD_SILVER_RATES;
+    setRates(mockRates);
+    setLatestRate(mockRates[0]);
+    setIsLoading(false);
   }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Mock data since we don't have a backend endpoint for this yet
-      // In production, this would call an API endpoint
-      const mockRates = MOCK_GOLD_SILVER_RATES;
-
-      setRates(mockRates);
-      setLatestRate(mockRates[0]);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch rate data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const calculateChange = (current: number, previous: number) => {
     if (!previous) return 0;
@@ -101,7 +86,7 @@ export default function RatesPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading gold & silver rates...</div>

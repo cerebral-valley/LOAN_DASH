@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
+import { loanApi } from '@/lib/api';
 import { Download, TrendingUp, Calculator, DollarSign, Calendar } from 'lucide-react';
 
 interface MonthlyProjection {

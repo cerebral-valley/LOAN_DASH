@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,8 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { isLoanReleased } from '@/lib/api';
 import { Download, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface PerformanceByType {
   type: string;
@@ -26,27 +30,7 @@ interface PerformanceByType {
 }
 
 export default function PerformancePage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLoans();
-  }, []);
-
-  const fetchLoans = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await loanApi.getAll();
-      setLoans(response.data);
-    } catch (err) {
-      setError('Failed to fetch performance data. Please ensure the backend server is running.');
-      console.error('Error fetching loans:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
 
   // Helper to safely get numeric value
   const safeNumber = (value: number | undefined | null): number => {
@@ -56,28 +40,29 @@ export default function PerformancePage() {
   };
 
   // Calculate performance metrics
-  const totalDisbursed = loans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
-  
-  // For released loans, pending_loan_amount should be 0 (fully paid)
-  // For active loans, pending_loan_amount is the outstanding amount
-  const releasedLoans = loans.filter((loan) => isLoanReleased(loan.released));
-  const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
-  
-  // Use interest_amount for released loans (actual interest earned)
-  const totalInterestReceived = releasedLoans.reduce(
-    (sum, loan) => sum + safeNumber(loan.interest_amount),
-    0
-  );
+  const metrics = useMemo(() => {
+    const totalDisbursed = loans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
+    
+    // For released loans, pending_loan_amount should be 0 (fully paid)
+    // For active loans, pending_loan_amount is the outstanding amount
+    const releasedLoans = loans.filter((loan) => isLoanReleased(loan.released));
+    const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
+    
+    // Use interest_amount for released loans (actual interest earned)
+    const totalInterestReceived = releasedLoans.reduce(
+      (sum, loan) => sum + safeNumber(loan.interest_amount),
+      0
+    );
 
-  // Collection Rate: How much principal has been repaid
-  // Released loans count as fully collected, active loans are outstanding
-  const totalCollected = releasedLoans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
-  const collectionRate = totalDisbursed > 0
-    ? (totalCollected / totalDisbursed) * 100
-    : 0;
+    // Collection Rate: How much principal has been repaid
+    // Released loans count as fully collected, active loans are outstanding
+    const totalCollected = releasedLoans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
+    const collectionRate = totalDisbursed > 0
+      ? (totalCollected / totalDisbursed) * 100
+      : 0;
 
-  // Interest Yield: Interest earned as % of disbursed amount
-  const interestYield = totalDisbursed > 0
+    // Interest Yield: Interest earned as % of disbursed amount
+    const interestYield = totalDisbursed > 0
     ? (totalInterestReceived / totalDisbursed) * 100
     : 0;
 
