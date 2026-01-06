@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,8 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { isLoanReleased } from '@/lib/api';
 import { Download, Users, TrendingUp, Award } from 'lucide-react';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface CustomerMetrics {
   customerId: string;
@@ -26,79 +30,71 @@ interface CustomerMetrics {
 }
 
 export default function CustomerAnalyticsPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLoans();
-  }, []);
-
-  const fetchLoans = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await loanApi.getAll();
-      setLoans(response.data);
-    } catch (err) {
-      setError('Failed to fetch customer analytics data. Please ensure the backend server is running.');
-      console.error('Error fetching loans:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
 
   // Calculate customer-wise metrics
-  const customerMetrics = loans.reduce((acc, loan) => {
-    const customerId = loan.customer_id || 'Unknown';
-    const customerName = loan.customer_name || 'Unknown';
-    
-    if (!acc[customerId]) {
-      acc[customerId] = {
-        customerId,
-        customerName,
-        totalLoans: 0,
-        totalBorrowed: 0,
-        totalOutstanding: 0,
-        totalInterestPaid: 0,
-        activeLoans: 0,
-        avgLoanSize: 0,
-      };
-    }
+  const metrics = useMemo(() => {
+    const metrics.customerMetrics = loans.reduce((acc, loan) => {
+      const customerId = loan.customer_id || 'Unknown';
+      const customerName = loan.customer_name || 'Unknown';
+      
+      if (!acc[customerId]) {
+        acc[customerId] = {
+          customerId,
+          customerName,
+          totalLoans: 0,
+          totalBorrowed: 0,
+          totalOutstanding: 0,
+          totalInterestPaid: 0,
+          activeLoans: 0,
+          avgLoanSize: 0,
+        };
+      }
 
-    acc[customerId].totalLoans++;
-    acc[customerId].totalBorrowed += loan.loan_amount || 0;
-    acc[customerId].totalOutstanding += loan.pending_loan_amount || 0;
-    acc[customerId].totalInterestPaid += loan.interest_deposited_till_date || 0;
-    if (!isLoanReleased(loan.released)) {
-      acc[customerId].activeLoans++;
-    }
+      acc[customerId].totalLoans++;
+      acc[customerId].totalBorrowed += loan.loan_amount || 0;
+      acc[customerId].totalOutstanding += loan.pending_loan_amount || 0;
+      acc[customerId].totalInterestPaid += loan.interest_deposited_till_date || 0;
+      if (!isLoanReleased(loan.released)) {
+        acc[customerId].activeLoans++;
+      }
 
-    return acc;
-  }, {} as Record<string, CustomerMetrics>);
+      return acc;
+    }, {} as Record<string, CustomerMetrics>);
 
-  // Calculate average loan size for each customer
-  Object.values(customerMetrics).forEach((customer) => {
-    customer.avgLoanSize = customer.totalBorrowed / customer.totalLoans;
-  });
+    // Calculate average loan size for each customer
+    Object.values(customerMetrics).forEach((customer) => {
+      customer.avgLoanSize = customer.totalLoans > 0 ? customer.totalBorrowed / customer.totalLoans : 0;
+    });
 
-  // Sort by total borrowed (descending)
-  const sortedCustomers = Object.values(customerMetrics).sort(
-    (a, b) => b.totalBorrowed - a.totalBorrowed
-  );
+    // Sort by total borrowed (descending)
+    const sortedCustomers = Object.values(customerMetrics).sort(
+      (a, b) => b.totalBorrowed - a.totalBorrowed
+    );
 
-  // Top 10 customers
-  const topCustomers = sortedCustomers.slice(0, 10);
+    // Top 10 customers
+    const topCustomers = sortedCustomers.slice(0, 10);
 
-  // Calculate aggregate metrics
-  const totalCustomers = sortedCustomers.length;
-  const repeatCustomers = sortedCustomers.filter((c) => c.totalLoans > 1).length;
-  const avgLoansPerCustomer =
-    loans.length / totalCustomers;
+    // Calculate aggregate metrics
+    const totalCustomers = sortedCustomers.length;
+    const repeatCustomers = sortedCustomers.filter((c) => c.totalLoans > 1).length;
+    const avgLoansPerCustomer = loans.length > 0 && totalCustomers > 0
+      ? loans.length / totalCustomers
+      : 0;
 
-  const handleDownloadCSV = async () => {
+    return {
+      customerMetrics,
+      sortedCustomers,
+      topCustomers,
+      totalCustomers,
+      repeatCustomers,
+      avgLoansPerCustomer,
+    };
+  }, [loans]);
+
+  const handleDownloadCSV = () => {
     try {
-      const csvData = sortedCustomers.map((c) => ({
+      const csvData = metrics.sortedCustomers.map((c) => ({
         'Customer ID': c.customerId,
         'Customer Name': c.customerName,
         'Total Loans': c.totalLoans,
@@ -109,40 +105,19 @@ export default function CustomerAnalyticsPage() {
         'Average Loan Size': c.avgLoanSize.toFixed(2),
       }));
 
-      const csvString =
-        Object.keys(csvData[0]).join(',') +
-        '\n' +
-        csvData.map((row) => Object.values(row).join(',')).join('\n');
-
-      const blob = new Blob([csvString], { type: 'text/csv' });
-      downloadCSV(blob, 'customer-analytics.csv');
+      exportToCSV(csvData, 'customer-analytics.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading customer analytics...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchLoans}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch customer analytics data. Please ensure the backend server is running." onRetry={() => refetch()} />;
+  }
   }
 
   return (
@@ -203,7 +178,7 @@ export default function CustomerAnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{topCustomers[0]?.totalBorrowed.toLocaleString('en-IN') || 0}
+              ₹{metrics.topCustomers[0]?.totalBorrowed.toLocaleString('en-IN') || 0}
             </div>
             <p className="text-xs text-muted-foreground">Highest total borrowed</p>
           </CardContent>
@@ -233,7 +208,7 @@ export default function CustomerAnalyticsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {topCustomers.map((customer, index) => (
+                {metrics.topCustomers.map((customer, index) => (
                   <TableRow key={customer.customerId}>
                     <TableCell className="font-bold">{index + 1}</TableCell>
                     <TableCell className="font-medium">{customer.customerName}</TableCell>

@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, VyapariCustomer, downloadCSV } from '@/lib/api';
+import { VyapariCustomer } from '@/lib/api';
+import { useLoans, useVyapariCustomers } from '@/lib/queries';
 import { Download, Search, Filter } from 'lucide-react';
 import { extractUniqueYears, filterLoansByCustomerType, filterLoansByCustomer } from '@/lib/loan-utils';
 import { sumLoanAmounts, sumOutstanding, calculateAverageAmount } from '@/lib/aggregation-utils';
 import { formatCurrency, formatDate } from '@/lib/formatting-utils';
+import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 
@@ -18,11 +20,11 @@ const MONTHS = [
 ];
 
 export default function GranularPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [filteredLoans, setFilteredLoans] = useState<Loan[]>([]);
-  const [vyapariCustomers, setVyapariCustomers] = useState<VyapariCustomer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans();
+  const { data: vyapariCustomers = [], isLoading: customersLoading, error: customersError, refetch: refetchCustomers } = useVyapariCustomers();
+
+  const isLoading = loansLoading || customersLoading;
+  const error = loansError || customersError;
 
   // Filters
   const [selectedClient, setSelectedClient] = useState<string>('--ALL--');
@@ -31,46 +33,11 @@ export default function GranularPage() {
   const [selectedYear, setSelectedYear] = useState<string>('--All--');
   const [selectedMonth, setSelectedMonth] = useState<string>('--All--');
 
-  // Available filter options
-  const [years, setYears] = useState<string[]>([]);
+  // Extract unique years
+  const years = useMemo(() => extractUniqueYears(loans), [loans]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [loans, selectedClient, selectedType, selectedStatus, selectedYear, selectedMonth]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [loansResponse, customersResponse] = await Promise.all([
-        loanApi.getAll(),
-        loanApi.getVyapariCustomers(),
-      ]);
-
-      const loansData = loansResponse.data;
-      setLoans(loansData);
-
-      const customers = customersResponse.data.sort((a, b) =>
-        a.customer_name.localeCompare(b.customer_name)
-      );
-      setVyapariCustomers(customers);
-
-      // Extract unique years
-      setYears(extractUniqueYears(loansData));
-
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
+  // Apply filters
+  const filteredLoans = useMemo(() => {
     let filtered = [...loans];
 
     // Client filter
@@ -117,30 +84,50 @@ export default function GranularPage() {
       return true;
     });
 
-    setFilteredLoans(filtered);
-  };
+    return filtered;
+  }, [loans, selectedClient, selectedType, selectedStatus, selectedYear, selectedMonth]);
 
-  const handleDownloadCSV = async () => {
+  // Calculate metrics
+  const metrics = useMemo(() => {
+    const metrics.totalAmount = sumLoanAmounts(filteredLoans);
+    const metrics.totalCount = filteredLoans.length;
+    const metrics.averageAmount = calculateAverageAmount(filteredLoans);
+    const active = filteredLoans.filter((loan) => loan.released !== 'TRUE');
+    const metrics.totalOutstanding = sumOutstanding(active);
+
+    return {
+      metrics.totalAmount,
+      metrics.totalCount,
+      metrics.averageAmount,
+      metrics.activeLoans: active,
+      metrics.totalOutstanding,
+    };
+  }, [filteredLoans]);
+
+  const handleDownloadCSV = () => {
     try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'granular-analysis.csv');
+      const csvData = filteredLoans.map((loan) => ({
+        'Loan Number': loan.loan_number,
+        'Customer Name': loan.customer_name,
+        'Loan Amount': loan.loan_amount,
+        'Outstanding': loan.pending_loan_amount,
+        'Status': loan.released === 'TRUE' ? 'Released' : 'Open',
+        'Disbursement Date': loan.date_of_disbursement ? formatDate(new Date(loan.date_of_disbursement)) : 'N/A',
+        'Release Date': loan.date_of_release ? formatDate(new Date(loan.date_of_release)) : 'N/A',
+      }));
+      
+      exportToCSV(csvData, 'granular-analysis.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
-  const totalAmount = sumLoanAmounts(filteredLoans);
-  const totalCount = filteredLoans.length;
-  const averageAmount = calculateAverageAmount(filteredLoans);
-  const activeLoans = filteredLoans.filter((loan) => loan.released !== 'TRUE');
-  const totalOutstanding = sumOutstanding(activeLoans);
-
-  if (loading) {
-    return <LoadingState message="Loading granular analysis..." />;
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchData} />;
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => { refetchLoans(); refetchCustomers(); }} />;
   }
 
   return (
@@ -281,7 +268,7 @@ export default function GranularPage() {
             <Search className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.totalAmount)}</div>
             <p className="text-xs text-muted-foreground">Filtered total</p>
           </CardContent>
         </Card>
@@ -292,7 +279,7 @@ export default function GranularPage() {
             <Search className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCount}</div>
+            <div className="text-2xl font-bold">{metrics.totalCount}</div>
             <p className="text-xs text-muted-foreground">Number of loans</p>
           </CardContent>
         </Card>
@@ -304,7 +291,7 @@ export default function GranularPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(averageAmount, { showSymbol: true })}
+              {formatCurrency(metrics.averageAmount, { showSymbol: true })}
             </div>
             <p className="text-xs text-muted-foreground">Per loan</p>
           </CardContent>
@@ -316,7 +303,7 @@ export default function GranularPage() {
             <Search className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalOutstanding)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(metrics.totalOutstanding)}</div>
             <p className="text-xs text-muted-foreground">Pending amount</p>
           </CardContent>
         </Card>

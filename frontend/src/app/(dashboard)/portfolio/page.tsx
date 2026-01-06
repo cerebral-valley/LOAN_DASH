@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,101 +11,70 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV, isLoanReleased } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { useDownloadLoanCSV } from '@/lib/hooks';
+import { isLoanReleased } from '@/lib/api';
 import { Download, PieChart } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 export default function PortfolioPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLoans();
-  }, []);
-
-  const fetchLoans = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await loanApi.getAll();
-      setLoans(response.data);
-    } catch (err) {
-      setError('Failed to fetch portfolio data. Please ensure the backend server is running.');
-      console.error('Error fetching loans:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadCSV = async () => {
-    try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'portfolio-summary.csv');
-    } catch (err) {
-      console.error('Error downloading CSV:', err);
-    }
-  };
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { download: downloadCSV } = useDownloadLoanCSV();
 
   // Calculate portfolio metrics
-  const activeLoans = loans.filter((l) => !isLoanReleased(l.released));
-  const releasedLoans = loans.filter((l) => isLoanReleased(l.released));
+  const { activeLoans, releasedLoans, portfolioByType, ltvDistribution } = useMemo(() => {
+    const active = loans.filter((l) => !isLoanReleased(l.released));
+    const released = loans.filter((l) => isLoanReleased(l.released));
 
-  const portfolioByType = loans.reduce((acc, loan) => {
-    const type = loan.customer_type || 'Unknown';
-    if (!acc[type]) {
-      acc[type] = {
-        count: 0,
-        totalAmount: 0,
-        totalOutstanding: 0,
-      };
-    }
-    acc[type].count++;
-    acc[type].totalAmount += loan.loan_amount || 0;
-    acc[type].totalOutstanding += loan.pending_loan_amount || 0;
-    return acc;
-  }, {} as Record<string, { count: number; totalAmount: number; totalOutstanding: number }>);
+    const byType = loans.reduce((acc, loan) => {
+      const type = loan.customer_type || 'Unknown';
+      if (!acc[type]) {
+        acc[type] = {
+          count: 0,
+          totalAmount: 0,
+          totalOutstanding: 0,
+        };
+      }
+      acc[type].count++;
+      acc[type].totalAmount += loan.loan_amount || 0;
+      acc[type].totalOutstanding += loan.pending_loan_amount || 0;
+      return acc;
+    }, {} as Record<string, { count: number; totalAmount: number; totalOutstanding: number }>);
 
-  const ltvDistribution = [
-    {
-      range: '0-50%',
-      count: loans.filter((l) => (l.ltv_given || 0) <= 50).length,
-    },
-    {
-      range: '51-70%',
-      count: loans.filter((l) => (l.ltv_given || 0) > 50 && (l.ltv_given || 0) <= 70).length,
-    },
-    {
-      range: '71-85%',
-      count: loans.filter((l) => (l.ltv_given || 0) > 70 && (l.ltv_given || 0) <= 85).length,
-    },
-    {
-      range: '86-100%',
-      count: loans.filter((l) => (l.ltv_given || 0) > 85).length,
-    },
-  ];
+    const ltv = [
+      {
+        range: '0-50%',
+        count: loans.filter((l) => (l.ltv_given || 0) <= 50).length,
+      },
+      {
+        range: '51-70%',
+        count: loans.filter((l) => (l.ltv_given || 0) > 50 && (l.ltv_given || 0) <= 70).length,
+      },
+      {
+        range: '71-85%',
+        count: loans.filter((l) => (l.ltv_given || 0) > 70 && (l.ltv_given || 0) <= 85).length,
+      },
+      {
+        range: '86-100%',
+        count: loans.filter((l) => (l.ltv_given || 0) > 85).length,
+      },
+    ];
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading portfolio data...</div>
-      </div>
-    );
+    return {
+      activeLoans: active,
+      releasedLoans: released,
+      portfolioByType: byType,
+      ltvDistribution: ltv,
+    };
+  }, [loans]);
+
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchLoans}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch portfolio data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -117,7 +86,7 @@ export default function PortfolioPage() {
             Comprehensive portfolio analysis and distribution metrics
           </p>
         </div>
-        <Button onClick={handleDownloadCSV} variant="outline">
+        <Button onClick={() => downloadCSV('portfolio-summary.csv')} variant="outline">
           <Download className="mr-2 h-4 w-4" />
           Export CSV
         </Button>
