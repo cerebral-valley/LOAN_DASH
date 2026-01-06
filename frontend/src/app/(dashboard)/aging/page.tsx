@@ -11,8 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, Loan } from '@/lib/api';
 import { Download, Clock, AlertCircle } from 'lucide-react';
+import { calculateLoanAge, calculateAgeBucket } from '@/lib/loan-utils';
+import { formatCurrency, formatDate } from '@/lib/formatting-utils';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface AgingMetrics {
   loanNumber: number;
@@ -49,26 +54,11 @@ export default function AgingPage() {
 
   // Calculate aging metrics
   const calculateAging = (loan: Loan): AgingMetrics => {
-    const today = new Date();
     const disbursementDate = loan.date_of_disbursement
       ? new Date(loan.date_of_disbursement)
       : new Date();
-    const ageInDays = Math.floor(
-      (today.getTime() - disbursementDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    let ageBucket: string;
-    if (ageInDays <= 30) {
-      ageBucket = '0-30 days';
-    } else if (ageInDays <= 90) {
-      ageBucket = '31-90 days';
-    } else if (ageInDays <= 180) {
-      ageBucket = '91-180 days';
-    } else if (ageInDays <= 365) {
-      ageBucket = '181-365 days';
-    } else {
-      ageBucket = '365+ days';
-    }
+    const ageInDays = calculateLoanAge(loan.date_of_disbursement);
+    const ageBucket = calculateAgeBucket(ageInDays);
 
     return {
       loanNumber: loan.loan_number,
@@ -110,45 +100,23 @@ export default function AgingPage() {
         'Customer Name': a.customerName,
         'Loan Amount': a.loanAmount,
         'Outstanding': a.outstanding,
-        'Disbursement Date': a.disbursementDate.toLocaleDateString(),
+        'Disbursement Date': formatDate(a.disbursementDate),
         'Age (Days)': a.ageInDays,
         'Age Bucket': a.ageBucket,
       }));
 
-      const csvString =
-        Object.keys(csvData[0]).join(',') +
-        '\n' +
-        csvData.map((row) => Object.values(row).join(',')).join('\n');
-
-      const blob = new Blob([csvString], { type: 'text/csv' });
-      downloadCSV(blob, 'aging-analysis.csv');
+      exportToCSV(csvData, 'aging-analysis.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading aging analysis...</div>
-      </div>
-    );
+    return <LoadingState message="Loading aging analysis..." />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchLoans}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message={error} onRetry={fetchLoans} />;
   }
 
   return (
@@ -245,7 +213,7 @@ export default function AgingPage() {
                       <TableCell className="font-medium">{bucket.label}</TableCell>
                       <TableCell className="text-right">{bucket.loans.length}</TableCell>
                       <TableCell className="text-right">
-                        ₹{totalOutstanding.toLocaleString('en-IN')}
+                        {formatCurrency(totalOutstanding)}
                       </TableCell>
                       <TableCell className="text-right">
                         {((bucket.loans.length / loans.length) * 100).toFixed(1)}%
@@ -284,13 +252,13 @@ export default function AgingPage() {
                     <TableCell className="font-medium">{aging.loanNumber}</TableCell>
                     <TableCell>{aging.customerName}</TableCell>
                     <TableCell>
-                      {aging.disbursementDate.toLocaleDateString()}
+                      {formatDate(aging.disbursementDate)}
                     </TableCell>
                     <TableCell className="text-right">
-                      ₹{aging.loanAmount.toLocaleString('en-IN')}
+                      {formatCurrency(aging.loanAmount)}
                     </TableCell>
                     <TableCell className="text-right">
-                      ₹{aging.outstanding.toLocaleString('en-IN')}
+                      {formatCurrency(aging.outstanding)}
                     </TableCell>
                     <TableCell className="text-right font-bold">{aging.ageInDays}</TableCell>
                     <TableCell>

@@ -4,8 +4,20 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, Loan } from '@/lib/api';
 import { Download, TrendingUp, Calendar, PieChart } from 'lucide-react';
+import { calculateDaysToRelease } from '@/lib/loan-utils';
+import { 
+  sumLoanAmounts, 
+  sumInterest, 
+  calculatePortfolioYield, 
+  calculateSimpleReturn,
+  calculateWeightedAvgDays 
+} from '@/lib/aggregation-utils';
+import { formatCurrency, formatCurrencyInMillions, formatPercentage } from '@/lib/formatting-utils';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface YieldMetrics {
   portfolioYield: number;
@@ -75,32 +87,22 @@ export default function YieldPage() {
     }
   };
 
-  const calculateDaysToRelease = (disbursement: Date, release: Date): number => {
-    const diff = release.getTime() - disbursement.getTime();
-    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  const calculateDaysToReleaseFn = (loan: Loan): number => {
+    if (loan.date_of_disbursement && loan.date_of_release) {
+      return calculateDaysToRelease(
+        new Date(loan.date_of_disbursement),
+        new Date(loan.date_of_release)
+      );
+    }
+    return 0;
   };
 
   const calculateMetrics = (releasedLoans: Loan[]) => {
-    const totalCapital = releasedLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-    const totalInterest = releasedLoans.reduce((sum, loan) => sum + (loan.interest_deposited_till_date || 0), 0);
-
-    // Calculate weighted average days
-    const weightedDays = releasedLoans.reduce((sum, loan) => {
-      if (loan.date_of_disbursement && loan.date_of_release) {
-        const days = calculateDaysToRelease(loan.date_of_disbursement, loan.date_of_release);
-        return sum + (loan.loan_amount || 0) * days;
-      }
-      return sum;
-    }, 0);
-
-    const weightedAvgDays = totalCapital > 0 ? weightedDays / totalCapital : 0;
-
-    // Portfolio yield = (Total Interest / Total Capital) × (365 / Weighted Avg Days) × 100
-    const portfolioYield = totalCapital > 0 && weightedAvgDays > 0
-      ? (totalInterest / totalCapital) * (365 / weightedAvgDays) * 100
-      : 0;
-
-    const simpleReturn = totalCapital > 0 ? (totalInterest / totalCapital) * 100 : 0;
+    const totalCapital = sumLoanAmounts(releasedLoans);
+    const totalInterest = sumInterest(releasedLoans);
+    const weightedAvgDays = calculateWeightedAvgDays(releasedLoans, calculateDaysToReleaseFn);
+    const portfolioYield = calculatePortfolioYield(totalInterest, totalCapital, weightedAvgDays);
+    const simpleReturn = calculateSimpleReturn(totalInterest, totalCapital);
 
     setMetrics({
       portfolioYield,
@@ -114,7 +116,10 @@ export default function YieldPage() {
   const calculateHoldingPeriodSegments = (releasedLoans: Loan[]) => {
     const shortTerm = releasedLoans.filter((loan) => {
       if (loan.date_of_disbursement && loan.date_of_release) {
-        const days = calculateDaysToRelease(loan.date_of_disbursement, loan.date_of_release);
+        const days = calculateDaysToRelease(
+          new Date(loan.date_of_disbursement),
+          new Date(loan.date_of_release)
+        );
         return days < 30;
       }
       return false;
@@ -122,33 +127,27 @@ export default function YieldPage() {
 
     const longTerm = releasedLoans.filter((loan) => {
       if (loan.date_of_disbursement && loan.date_of_release) {
-        const days = calculateDaysToRelease(loan.date_of_disbursement, loan.date_of_release);
+        const days = calculateDaysToRelease(
+          new Date(loan.date_of_disbursement),
+          new Date(loan.date_of_release)
+        );
         return days >= 30;
       }
       return false;
     });
 
     const calculateSegmentYield = (loans: Loan[]) => {
-      const totalCapital = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-      const totalInterest = loans.reduce((sum, loan) => sum + (loan.interest_deposited_till_date || 0), 0);
-      const weightedDays = loans.reduce((sum, loan) => {
-        if (loan.date_of_disbursement && loan.date_of_release) {
-          const days = calculateDaysToRelease(loan.date_of_disbursement, loan.date_of_release);
-          return sum + (loan.loan_amount || 0) * days;
-        }
-        return sum;
-      }, 0);
-      const avgDays = totalCapital > 0 ? weightedDays / totalCapital : 0;
-      const portfolioYield = totalCapital > 0 && avgDays > 0
-        ? (totalInterest / totalCapital) * (365 / avgDays) * 100
-        : 0;
+      const totalCapital = sumLoanAmounts(loans);
+      const totalInterest = sumInterest(loans);
+      const avgDays = calculateWeightedAvgDays(loans, calculateDaysToReleaseFn);
+      const portfolioYield = calculatePortfolioYield(totalInterest, totalCapital, avgDays);
       return { portfolioYield, capital: totalCapital, avgDays: Math.round(avgDays) };
     };
 
     const shortTermData = calculateSegmentYield(shortTerm);
     const longTermData = calculateSegmentYield(longTerm);
 
-    const totalCapital = releasedLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+    const totalCapital = sumLoanAmounts(releasedLoans);
 
     setHoldingPeriodSegments([
       {
@@ -179,27 +178,17 @@ export default function YieldPage() {
       { min: 200000, max: Infinity, label: '₹200K+' },
     ];
 
-    const totalCapital = releasedLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+    const totalCapital = sumLoanAmounts(releasedLoans);
 
     const bucketData = buckets.map((bucket) => {
       const bucketLoans = releasedLoans.filter(
         (loan) => loan.loan_amount && loan.loan_amount >= bucket.min && loan.loan_amount < bucket.max
       );
 
-      const capital = bucketLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-      const interest = bucketLoans.reduce((sum, loan) => sum + (loan.interest_deposited_till_date || 0), 0);
-      const weightedDays = bucketLoans.reduce((sum, loan) => {
-        if (loan.date_of_disbursement && loan.date_of_release) {
-          const days = calculateDaysToRelease(loan.date_of_disbursement, loan.date_of_release);
-          return sum + (loan.loan_amount || 0) * days;
-        }
-        return sum;
-      }, 0);
-
-      const avgDays = capital > 0 ? weightedDays / capital : 0;
-      const portfolioYield = capital > 0 && avgDays > 0
-        ? (interest / capital) * (365 / avgDays) * 100
-        : 0;
+      const capital = sumLoanAmounts(bucketLoans);
+      const interest = sumInterest(bucketLoans);
+      const avgDays = calculateWeightedAvgDays(bucketLoans, calculateDaysToReleaseFn);
+      const portfolioYield = calculatePortfolioYield(interest, capital, avgDays);
 
       return {
         range: bucket.label,
@@ -219,66 +208,42 @@ export default function YieldPage() {
       // Export the calculated yield analysis data
       const csvData = [
         {
-          'Portfolio Yield': metrics?.portfolioYield.toFixed(2) + '%',
-          'Simple Return': metrics?.simpleReturn.toFixed(2) + '%',
-          'Total Interest': '₹' + ((metrics?.totalInterest || 0) / 1000000).toFixed(2) + 'M',
-          'Total Capital': '₹' + ((metrics?.totalCapital || 0) / 1000000).toFixed(2) + 'M',
+          'Portfolio Yield': formatPercentage(metrics?.portfolioYield),
+          'Simple Return': formatPercentage(metrics?.simpleReturn),
+          'Total Interest': formatCurrencyInMillions(metrics?.totalInterest),
+          'Total Capital': formatCurrencyInMillions(metrics?.totalCapital),
           'Weighted Avg Days': metrics?.weightedAvgDays?.toString() || '0',
         },
         ...holdingPeriodSegments.map((segment) => ({
           Segment: segment.segment,
-          'Portfolio Yield': segment.portfolioYield.toFixed(2) + '%',
-          Capital: '₹' + segment.capital.toLocaleString('en-IN'),
-          '% of Portfolio': segment.portfolioPercentage.toFixed(1) + '%',
+          'Portfolio Yield': formatPercentage(segment.portfolioYield),
+          Capital: formatCurrency(segment.capital),
+          '% of Portfolio': formatPercentage(segment.portfolioPercentage, 1),
           'Loan Count': segment.loanCount.toString(),
           'Avg Holding Days': segment.avgDays + ' days',
         })),
         ...loanAmountBuckets.map((bucket) => ({
           'Loan Amount Range': bucket.range,
-          'Portfolio Yield': bucket.portfolioYield.toFixed(2) + '%',
-          Capital: '₹' + bucket.capital.toLocaleString('en-IN'),
-          '% of Portfolio': bucket.portfolioPercentage.toFixed(1) + '%',
+          'Portfolio Yield': formatPercentage(bucket.portfolioYield),
+          Capital: formatCurrency(bucket.capital),
+          '% of Portfolio': formatPercentage(bucket.portfolioPercentage, 1),
           'Loan Count': bucket.loanCount.toString(),
           'Avg Holding Days': bucket.avgDays + ' days',
         })),
       ];
 
-      const csvString = [
-        Object.keys(csvData[0]).join(','),
-        ...csvData.map((row) =>
-          Object.values(row).map((val) => `"${val}"`).join(',')
-        )
-      ].join('\n');
-
-      const blob = new Blob([csvString], { type: 'text/csv' });
-      downloadCSV(blob, 'interest-yield-analysis.csv');
+      exportToCSV(csvData, 'interest-yield-analysis.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading interest yield analysis...</div>
-      </div>
-    );
+    return <LoadingState message="Loading interest yield analysis..." />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message={error} onRetry={fetchData} />;
   }
 
   return (
@@ -304,7 +269,9 @@ export default function YieldPage() {
             <TrendingUp className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.portfolioYield.toFixed(2)}%</div>
+            <div className="text-2xl font-bold">
+              {formatPercentage(metrics?.portfolioYield)}
+            </div>
             <p className="text-xs text-muted-foreground">Annualized return</p>
           </CardContent>
         </Card>
@@ -315,7 +282,7 @@ export default function YieldPage() {
             <TrendingUp className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.simpleReturn.toFixed(2)}%</div>
+            <div className="text-2xl font-bold">{formatPercentage(metrics?.simpleReturn)}</div>
             <p className="text-xs text-muted-foreground">Non-annualized</p>
           </CardContent>
         </Card>
@@ -327,7 +294,7 @@ export default function YieldPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{((metrics?.totalInterest || 0) / 1000000).toFixed(2)}M
+              {formatCurrencyInMillions(metrics?.totalInterest)}
             </div>
             <p className="text-xs text-muted-foreground">Interest collected</p>
           </CardContent>
@@ -340,7 +307,7 @@ export default function YieldPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{((metrics?.totalCapital || 0) / 1000000).toFixed(2)}M
+              {formatCurrencyInMillions(metrics?.totalCapital)}
             </div>
             <p className="text-xs text-muted-foreground">Principal deployed</p>
           </CardContent>
@@ -388,13 +355,13 @@ export default function YieldPage() {
                     <TableRow key={segment.segment}>
                       <TableCell className="font-medium">{segment.segment}</TableCell>
                       <TableCell className="text-right font-bold text-green-600">
-                        {segment.portfolioYield.toFixed(2)}%
+                        {formatPercentage(segment.portfolioYield)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ₹{segment.capital.toLocaleString('en-IN')}
+                        {formatCurrency(segment.capital)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {segment.portfolioPercentage.toFixed(1)}%
+                        {formatPercentage(segment.portfolioPercentage, 1)}
                       </TableCell>
                       <TableCell className="text-right">{segment.loanCount}</TableCell>
                       <TableCell className="text-right">{segment.avgDays} days</TableCell>
@@ -437,13 +404,13 @@ export default function YieldPage() {
                     <TableRow key={bucket.range}>
                       <TableCell className="font-medium">{bucket.range}</TableCell>
                       <TableCell className="text-right font-bold text-blue-600">
-                        {bucket.portfolioYield.toFixed(2)}%
+                        {formatPercentage(bucket.portfolioYield)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ₹{bucket.capital.toLocaleString('en-IN')}
+                        {formatCurrency(bucket.capital)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {bucket.portfolioPercentage.toFixed(1)}%
+                        {formatPercentage(bucket.portfolioPercentage, 1)}
                       </TableCell>
                       <TableCell className="text-right">{bucket.loanCount}</TableCell>
                       <TableCell className="text-right">{bucket.avgDays} days</TableCell>
