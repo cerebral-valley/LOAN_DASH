@@ -23,36 +23,10 @@ interface MonthlyProjection {
 const DEFAULT_INTEREST_RATE = 12; // 12% per annum
 
 export default function ProjectionsPage() {
-  const [projections, setProjections] = useState<MonthlyProjection[]>([]);
-  const [totalProjectedRevenue, setTotalProjectedRevenue] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
 
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getAll();
-      const loansData = response.data;
-
-      // Calculate projections
-      calculateProjections(loansData);
-
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateProjections = (loansData: Loan[]) => {
-    const activeLoans = loansData.filter((loan) => loan.released !== 'TRUE');
+  const { projections, totalProjectedRevenue } = useMemo(() => {
+    const activeLoans = loans.filter((loan) => loan.released !== 'TRUE');
     
     // Calculate current metrics
     const currentOutstanding = activeLoans.reduce(
@@ -67,13 +41,13 @@ export default function ProjectionsPage() {
       : DEFAULT_INTEREST_RATE; // Use default if no rates available
 
     // Calculate historical monthly averages for projections
-    const releasedLoans = loansData.filter((loan) => loan.released === 'TRUE');
+    const releasedLoans = loans.filter((loan) => loan.released === 'TRUE');
     const avgMonthlyCollections = releasedLoans.length > 0
       ? releasedLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0) / 12
       : currentOutstanding * 0.1; // Assume 10% monthly collection if no history
 
-    const avgMonthlyDisbursements = loansData.length > 0
-      ? loansData.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0) / 12
+    const avgMonthlyDisbursements = loans.length > 0
+      ? loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0) / 12
       : currentOutstanding * 0.15; // Assume 15% monthly growth if no history
 
     // Generate 6-month projections
@@ -106,9 +80,13 @@ export default function ProjectionsPage() {
       });
     });
 
-    setProjections(projectionData);
-    setTotalProjectedRevenue(projectionData.reduce((sum, p) => sum + p.projectedInterest, 0));
-  };
+    const totalRevenue = projectionData.reduce((sum, p) => sum + p.projectedInterest, 0);
+
+    return {
+      projections: projectionData,
+      totalProjectedRevenue: totalRevenue,
+    };
+  }, [loans]);
 
   const handleDownloadCSV = () => {
     const csvContent = projections.map((proj) => ({
@@ -130,28 +108,12 @@ export default function ProjectionsPage() {
     downloadCSV(blob, 'revenue-projections.csv');
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading revenue projections...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
