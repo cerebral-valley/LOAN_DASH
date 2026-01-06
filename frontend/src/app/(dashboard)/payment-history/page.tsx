@@ -22,27 +22,27 @@ export default function PaymentHistoryPage() {
 
   // Calculate payment metrics
   const metrics = useMemo(() => {
-    const metrics.loansWithPayments = loans.filter(
+    const loansWithPayments = loans.filter(
       (loan) => loan.interest_deposited_till_date && loan.interest_deposited_till_date > 0
     );
 
-    const metrics.totalInterestPaid = loans.reduce(
+    const totalInterestPaid = loans.reduce(
       (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
       0
     );
 
-    const metrics.totalPrincipalPaid = loans.reduce((sum, loan) => {
+    const totalPrincipalPaid = loans.reduce((sum, loan) => {
       const disbursed = loan.loan_amount || 0;
       const outstanding = loan.pending_loan_amount || 0;
       return sum + (disbursed - outstanding);
     }, 0);
 
-    const metrics.avgPaymentPerLoan = metrics.loansWithPayments.length > 0
-      ? metrics.totalInterestPaid / metrics.loansWithPayments.length
+    const avgPaymentPerLoan = loansWithPayments.length > 0
+      ? totalInterestPaid / loansWithPayments.length
       : 0;
 
     // Recent payments (loans with last interest payment date)
-    const metrics.recentPayments = loans
+    const recentPayments = loans
       .filter((loan) => loan.last_date_of_interest_deposit)
       .sort((a, b) => {
         const dateA = a.last_date_of_interest_deposit
@@ -56,11 +56,11 @@ export default function PaymentHistoryPage() {
       .slice(0, 20);
 
     return {
-      metrics.loansWithPayments,
-      metrics.totalInterestPaid,
-      metrics.totalPrincipalPaid,
-      metrics.avgPaymentPerLoan,
-      metrics.recentPayments,
+      loansWithPayments,
+      totalInterestPaid,
+      totalPrincipalPaid,
+      avgPaymentPerLoan,
+      recentPayments,
     };
   }, [loans]);
 

@@ -103,6 +103,41 @@ export interface Expense {
   user?: string;
 }
 
+export interface GoldSilverRate {
+  id: number;
+  rate_date: string;
+  rate_time: string;
+  ngp_hazir_gold: number;
+  ngp_hazir_silver: number;
+  ngp_gst_gold: number;
+  ngp_gst_silver: number;
+  usd_inr: number;
+  cmx_gold_usd: number;
+  cmx_silver_usd: number;
+  created_at: Date;
+}
+
+export interface MovingAverageData {
+  days: number;
+  current: {
+    gold: number;
+    silver: number;
+  };
+  average: {
+    gold: number;
+    silver: number;
+  };
+  difference: {
+    gold: number;
+    silver: number;
+  };
+  percentChange: {
+    gold: string;
+    silver: string;
+  };
+  rates: GoldSilverRate[];
+}
+
 // Transform expense data to ensure numeric fields are numbers
 const transformExpense = (expense: Record<string, unknown>): Expense => ({
   id: Number(expense.id),
@@ -236,4 +271,15 @@ export const downloadCSV = (data: Blob, filename: string) => {
   link.click();
   document.body.removeChild(link);
   window.URL.revokeObjectURL(url);
+};
+
+// Gold & Silver Rates API calls
+export const ratesApi = {
+  getAll: () => api.get<GoldSilverRate[]>('/rates'),
+  getLatest: (limit = 30) => api.get<GoldSilverRate[]>(`/rates/latest?limit=${limit}`),
+  getCurrent: () => api.get<GoldSilverRate>('/rates/current'),
+  getByDate: (date: string) => api.get<GoldSilverRate>(`/rates/date/${date}`),
+  getRange: (startDate: string, endDate: string) => 
+    api.get<GoldSilverRate[]>(`/rates/range?startDate=${startDate}&endDate=${endDate}`),
+  getMovingAverage: (days = 90) => api.get<MovingAverageData>(`/rates/moving-average?days=${days}`),
 };

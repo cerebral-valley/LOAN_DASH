@@ -13,6 +13,23 @@ export async function runMigrations() {
   try {
     console.log('📦 Running database migrations...');
     
+    // Create migrations tracking table if it doesn't exist
+    await AppDataSource.query(`
+      CREATE TABLE IF NOT EXISTS migrations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // Get list of already executed migrations
+    const executedMigrations = await AppDataSource.query(
+      'SELECT name FROM migrations'
+    );
+    const executedNames = new Set(
+      executedMigrations.map((m: { name: string }) => m.name)
+    );
+    
     // List of migration files to run in order
     const migrations = [
       '001_add_performance_indexes.sql',
@@ -20,6 +37,12 @@ export async function runMigrations() {
     ];
     
     for (const migrationFile of migrations) {
+      // Skip if already executed
+      if (executedNames.has(migrationFile)) {
+        console.log(`  ⏭️  Skipping (already executed): ${migrationFile}`);
+        continue;
+      }
+      
       console.log(`  Running migration: ${migrationFile}`);
       const migrationPath = join(__dirname, migrationFile);
       const migrationSQL = readFileSync(migrationPath, 'utf-8');
@@ -34,6 +57,12 @@ export async function runMigrations() {
       for (const statement of statements) {
         await AppDataSource.query(statement);
       }
+      
+      // Record migration as executed
+      await AppDataSource.query(
+        'INSERT INTO migrations (name) VALUES (?)',
+        [migrationFile]
+      );
       
       console.log(`  ✅ Completed: ${migrationFile}`);
     }

@@ -114,9 +114,21 @@ export default function PerformancePage() {
     (a, b) => b.disbursed - a.disbursed
   );
 
+  return {
+    totalDisbursed,
+    totalInterestReceived,
+    collectionRate,
+    interestYield,
+    activeRate,
+    activeLoans,
+    releasedLoans,
+    performanceData,
+  };
+}, [loans]);
+
   const handleDownloadCSV = async () => {
     try {
-      const csvData = performanceData.map((perf) => ({
+      const csvData = metrics.performanceData.map((perf) => ({
         'Customer Type': perf.type,
         'Loan Count': perf.count,
         'Total Disbursed': perf.disbursed,
@@ -126,40 +138,18 @@ export default function PerformancePage() {
         'Yield Rate': `${perf.yieldRate.toFixed(2)}%`,
       }));
 
-      const csvString =
-        Object.keys(csvData[0]).join(',') +
-        '\n' +
-        csvData.map((row) => Object.values(row).join(',')).join('\n');
-
-      const blob = new Blob([csvString], { type: 'text/csv' });
-      downloadCSV(blob, 'performance-dashboard.csv');
+      exportToCSV(csvData, 'performance-dashboard.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading performance data...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchLoans}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch performance data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -184,7 +174,7 @@ export default function PerformancePage() {
             <Target className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{collectionRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{metrics.collectionRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">Principal recovery rate</p>
           </CardContent>
         </Card>
@@ -195,7 +185,7 @@ export default function PerformancePage() {
             <TrendingUp className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{interestYield.toFixed(2)}%</div>
+            <div className="text-2xl font-bold">{metrics.interestYield.toFixed(2)}%</div>
             <p className="text-xs text-muted-foreground">Interest to disbursed ratio</p>
           </CardContent>
         </Card>
@@ -206,7 +196,7 @@ export default function PerformancePage() {
             <BarChart3 className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold">{metrics.activeRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">Active loans percentage</p>
           </CardContent>
         </Card>
@@ -218,7 +208,7 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {((collectionRate + interestYield) / 2).toFixed(1)}%
+              {((metrics.collectionRate + metrics.interestYield) / 2).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">Overall performance score</p>
           </CardContent>
@@ -247,7 +237,7 @@ export default function PerformancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {performanceData.map((perf) => (
+                {metrics.performanceData.map((perf) => (
                   <TableRow key={perf.type}>
                     <TableCell className="font-medium">{perf.type}</TableCell>
                     <TableCell className="text-right">{perf.count}</TableCell>
@@ -282,7 +272,7 @@ export default function PerformancePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {performanceData
+              {metrics.performanceData
                 .slice()
                 .sort((a, b) => b.yieldRate - a.yieldRate)
                 .slice(0, 5)
@@ -313,25 +303,25 @@ export default function PerformancePage() {
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Best Collection Rate</span>
                 <span className="text-sm font-bold text-green-600">
-                  {Math.max(...performanceData.map((p) => p.collectionRate)).toFixed(1)}%
+                  {Math.max(...metrics.performanceData.map((p) => p.collectionRate)).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Best Yield Rate</span>
                 <span className="text-sm font-bold text-blue-600">
-                  {Math.max(...performanceData.map((p) => p.yieldRate)).toFixed(2)}%
+                  {Math.max(...metrics.performanceData.map((p) => p.yieldRate)).toFixed(2)}%
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Total Customer Segments</span>
                 <span className="text-sm text-muted-foreground">
-                  {performanceData.length}
+                  {metrics.performanceData.length}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Avg Loans per Segment</span>
                 <span className="text-sm text-muted-foreground">
-                  {(loans.length / performanceData.length).toFixed(0)}
+                  {(loans.length / metrics.performanceData.length).toFixed(0)}
                 </span>
               </div>
             </div>

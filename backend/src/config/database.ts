@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import { Loan } from '../entities/Loan';
 import { ExpenseTracker } from '../entities/ExpenseTracker';
+import { GoldSilverRate } from '../entities/GoldSilverRate';
 
 export const AppDataSource = new DataSource({
   type: 'mysql',
@@ -12,7 +13,7 @@ export const AppDataSource = new DataSource({
   database: process.env.MYSQL_DB || 'loan_dash',
   synchronize: false, // Don't auto-create schema
   logging: process.env.NODE_ENV === 'development',
-  entities: [Loan, ExpenseTracker],
+  entities: [Loan, ExpenseTracker, GoldSilverRate],
   subscribers: [],
   migrations: [],
   // Connection pooling configuration for better performance

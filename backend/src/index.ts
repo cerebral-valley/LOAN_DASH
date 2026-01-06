@@ -7,6 +7,7 @@ import { initializeDatabase } from './config/database';
 import { runMigrations } from './migrations/runMigrations';
 import loanRoutes from './routes/loanRoutes';
 import expenseRoutes from './routes/expenseRoutes';
+import ratesRoutes from './routes/ratesRoutes';
 import { etagMiddleware } from './utils/cacheMiddleware';
 
 const app = express();
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/loans', loanRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/rates', ratesRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

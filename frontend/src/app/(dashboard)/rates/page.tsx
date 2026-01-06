@@ -4,56 +4,48 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Download, DollarSign, TrendingUp, Calendar } from 'lucide-react';
+import { Download, DollarSign, TrendingUp, Calendar, RefreshCw } from 'lucide-react';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
-
-interface GoldSilverRate {
-  rate_date: string;
-  ngp_hazir_gold: number;
-  ngp_hazir_silver: number;
-  ngp_gst_gold: number;
-  ngp_gst_silver: number;
-}
-
-// Mock data for gold and silver rates
-// In production, this would be fetched from the backend API
-const MOCK_GOLD_SILVER_RATES: GoldSilverRate[] = [
-  {
-    rate_date: new Date().toISOString().split('T')[0],
-    ngp_hazir_gold: 74500,
-    ngp_hazir_silver: 88500,
-    ngp_gst_gold: 78630,
-    ngp_gst_silver: 93390
-  },
-  {
-    rate_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
-    ngp_hazir_gold: 74300,
-    ngp_hazir_silver: 88200,
-    ngp_gst_gold: 78420,
-    ngp_gst_silver: 93072
-  },
-  {
-    rate_date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
-    ngp_hazir_gold: 74800,
-    ngp_hazir_silver: 88800,
-    ngp_gst_gold: 78946,
-    ngp_gst_silver: 93696
-  }
-];
+import { ratesApi, type GoldSilverRate, type MovingAverageData } from '@/lib/api';
 
 export default function RatesPage() {
   const [rates, setRates] = useState<GoldSilverRate[]>([]);
   const [latestRate, setLatestRate] = useState<GoldSilverRate | null>(null);
+  const [movingAvg, setMovingAvg] = useState<MovingAverageData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch latest 30 rates
+      const ratesResponse = await ratesApi.getLatest(30);
+      setRates(ratesResponse.data);
+      
+      if (ratesResponse.data.length > 0) {
+        setLatestRate(ratesResponse.data[0]);
+      }
+
+      // Fetch 90-day moving average
+      try {
+        const avgResponse = await ratesApi.getMovingAverage(90);
+        setMovingAvg(avgResponse.data);
+      } catch (err) {
+        console.warn('Moving average not available:', err);
+      }
+    } catch (err: any) {
+      console.error('Error fetching rates:', err);
+      setError(err.response?.data?.error || 'Failed to load gold and silver rates. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Mock data since we don't have a backend endpoint for this yet
-    // In production, this would call an API endpoint
-    const mockRates = MOCK_GOLD_SILVER_RATES;
-    setRates(mockRates);
-    setLatestRate(mockRates[0]);
-    setIsLoading(false);
+    fetchData();
   }, []);
 
   const calculateChange = (current: number, previous: number) => {
@@ -64,10 +56,14 @@ export default function RatesPage() {
   const handleDownloadCSV = () => {
     const csvContent = rates.map((rate) => ({
       Date: rate.rate_date,
+      'Time': rate.rate_time,
       'Gold (Hazir)': rate.ngp_hazir_gold,
       'Silver (Hazir)': rate.ngp_hazir_silver,
       'Gold (GST)': rate.ngp_gst_gold,
-      'Silver (GST)': rate.ngp_gst_silver
+      'Silver (GST)': rate.ngp_gst_silver,
+      'USD/INR': rate.usd_inr,
+      'COMEX Gold (USD)': rate.cmx_gold_usd,
+      'COMEX Silver (USD)': rate.cmx_silver_usd,
     }));
 
     exportToCSV(csvContent, 'gold-silver-rates.csv');
@@ -76,12 +72,40 @@ export default function RatesPage() {
   if (isLoading) {
     return <LoadingState />;
   }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-red-200 bg-red-50">
           <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
+            <CardTitle className="text-red-700">Connection Error</CardTitle>
+            <CardDescription className="text-red-600">{error}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
+            <Button onClick={fetchData} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (rates.length === 0) {
+    return (
+      <div className="p-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>No Data Available</CardTitle>
+            <CardDescription>
+              No gold and silver rates found in the database. Please import the rates data first.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Run: <code className="rounded bg-muted px-2 py-1">python insert_gold_silver_rates.py</code>
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -220,6 +244,65 @@ export default function RatesPage() {
         </div>
       )}
 
+      {/* 3-Month Moving Average */}
+      {movingAvg && latestRate && (
+        <div className="mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>📈 3-Month Moving Average Analysis</CardTitle>
+              <CardDescription>
+                Comparison of current rates with 90-day moving average
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <h3 className="mb-4 text-lg font-semibold text-yellow-600">Gold</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Current Rate</span>
+                      <span className="font-bold">₹{movingAvg.current.gold.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">90-Day Average</span>
+                      <span className="font-medium">₹{movingAvg.average.gold.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t pt-3">
+                      <span className="text-sm font-medium">Difference</span>
+                      <span className={`font-bold ${parseFloat(movingAvg.percentChange.gold) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {parseFloat(movingAvg.percentChange.gold) >= 0 ? '+' : ''}
+                        ₹{movingAvg.difference.gold.toLocaleString('en-IN')} ({movingAvg.percentChange.gold}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4">
+                  <h3 className="mb-4 text-lg font-semibold text-gray-600">Silver</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Current Rate</span>
+                      <span className="font-bold">₹{movingAvg.current.silver.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">90-Day Average</span>
+                      <span className="font-medium">₹{movingAvg.average.silver.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t pt-3">
+                      <span className="text-sm font-medium">Difference</span>
+                      <span className={`font-bold ${parseFloat(movingAvg.percentChange.silver) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {parseFloat(movingAvg.percentChange.silver) >= 0 ? '+' : ''}
+                        ₹{movingAvg.difference.silver.toLocaleString('en-IN')} ({movingAvg.percentChange.silver}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Historical Rates */}
       <div className="mb-8">
         <Card>
@@ -275,18 +358,25 @@ export default function RatesPage() {
             <CardTitle>About Gold & Silver Rates</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               These rates reflect the Nagpur market prices for gold (per 10 grams) and silver (per kilogram). 
               Both spot (Hazir) and GST-inclusive rates are shown. Rates are updated daily based on market 
               conditions and can be used for loan valuation and LTV calculations.
             </p>
-            <div className="mt-4 rounded-lg bg-yellow-50 p-4 border border-yellow-200">
-              <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> This page currently displays sample data. In production, rates would be 
-                imported from the backend database (gold_silver_rates table) which contains historical data 
-                from 2021 onwards.
-              </p>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p><strong>Hazir Rate:</strong> Spot/ready delivery price</p>
+              <p><strong>GST Rate:</strong> Rate including Goods & Services Tax (3% for gold, 5% for silver)</p>
+              <p><strong>Data Source:</strong> Nagpur market daily rates</p>
+              <p><strong>International Rates:</strong> COMEX gold and silver prices in USD, plus USD/INR exchange rate</p>
             </div>
+            {rates.length > 0 && (
+              <div className="mt-4 rounded-lg bg-green-50 p-4 border border-green-200">
+                <p className="text-sm text-green-800">
+                  <strong>✅ Live Data:</strong> Currently displaying {rates.length} days of historical rates from 
+                  the database. Data range: September 2021 - October 2025.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

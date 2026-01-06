@@ -19,22 +19,22 @@ export default function ProfitabilityPage() {
 
   // Calculate profitability metrics
   const metrics = useMemo(() => {
-    const metrics.totalInterestReceived = loans.reduce(
+    const totalInterestReceived = loans.reduce(
       (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
       0
     );
 
-    const metrics.totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
-    const metrics.grossProfit = metrics.totalInterestReceived;
-    const metrics.netProfit = metrics.totalInterestReceived - metrics.totalExpenses;
-    const metrics.profitMargin = metrics.totalInterestReceived > 0 
-      ? ((metrics.netProfit / metrics.totalInterestReceived) * 100) 
+    const grossProfit = totalInterestReceived;
+    const netProfit = totalInterestReceived - totalExpenses;
+    const profitMargin = totalInterestReceived > 0 
+      ? ((netProfit / totalInterestReceived) * 100) 
       : 0;
 
-    const metrics.totalDisbursed = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-    const metrics.roi = metrics.totalDisbursed > 0 
-      ? ((metrics.totalInterestReceived / metrics.totalDisbursed) * 100) 
+    const totalDisbursed = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+    const roi = totalDisbursed > 0 
+      ? ((totalInterestReceived / totalDisbursed) * 100) 
       : 0;
 
     // Monthly breakdown
@@ -73,13 +73,13 @@ export default function ProfitabilityPage() {
     }
 
     return {
-      metrics.totalInterestReceived,
-      metrics.totalExpenses,
-      metrics.grossProfit,
-      metrics.netProfit,
-      metrics.profitMargin,
-      metrics.roi,
-      metrics.totalDisbursed,
+      totalInterestReceived,
+      totalExpenses,
+      grossProfit,
+      netProfit,
+      profitMargin,
+      roi,
+      totalDisbursed,
       monthlyData,
     };
   }, [loans, expenses]);
@@ -87,12 +87,12 @@ export default function ProfitabilityPage() {
   const handleDownloadCSV = () => {
     try {
       const csvData = {
-        'Total Interest Received': metrics.metrics.totalInterestReceived,
-        'Total Expenses': metrics.metrics.totalExpenses,
-        'Gross Profit': metrics.metrics.grossProfit,
-        'Net Profit': metrics.metrics.netProfit,
-        'Profit Margin': `${metrics.metrics.metrics.profitMargin.toFixed(2)}%`,
-        'ROI': `${metrics.metrics.metrics.roi.toFixed(2)}%`,
+        'Total Interest Received': metrics.totalInterestReceived,
+        'Total Expenses': metrics.totalExpenses,
+        'Gross Profit': metrics.grossProfit,
+        'Net Profit': metrics.netProfit,
+        'Profit Margin': `${metrics.profitMargin.toFixed(2)}%`,
+        'ROI': `${metrics.roi.toFixed(2)}%`,
       };
 
       const csvString =
@@ -149,7 +149,7 @@ export default function ProfitabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{metrics.metrics.grossProfit.toLocaleString('en-IN')}
+              ₹{metrics.grossProfit.toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">Total interest received</p>
           </CardContent>
@@ -162,7 +162,7 @@ export default function ProfitabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{metrics.metrics.totalExpenses.toLocaleString('en-IN')}
+              ₹{metrics.totalExpenses.toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">Operating costs</p>
           </CardContent>
@@ -175,7 +175,7 @@ export default function ProfitabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{metrics.metrics.netProfit.toLocaleString('en-IN')}
+              ₹{metrics.netProfit.toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">After expenses</p>
           </CardContent>
@@ -187,7 +187,7 @@ export default function ProfitabilityPage() {
             <PieChart className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.metrics.roi.toFixed(2)}%</div>
+            <div className="text-2xl font-bold">{metrics.roi.toFixed(2)}%</div>
             <p className="text-xs text-muted-foreground">Return on investment</p>
           </CardContent>
         </Card>
@@ -204,7 +204,7 @@ export default function ProfitabilityPage() {
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Profit Margin</span>
                 <span className="text-sm font-bold text-green-500">
-                  {metrics.metrics.profitMargin.toFixed(2)}%
+                  {metrics.profitMargin.toFixed(2)}%
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">

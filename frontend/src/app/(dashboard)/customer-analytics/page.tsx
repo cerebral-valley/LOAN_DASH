@@ -34,7 +34,7 @@ export default function CustomerAnalyticsPage() {
 
   // Calculate customer-wise metrics
   const metrics = useMemo(() => {
-    const metrics.customerMetrics = loans.reduce((acc, loan) => {
+    const customerMetrics = loans.reduce((acc, loan) => {
       const customerId = loan.customer_id || 'Unknown';
       const customerName = loan.customer_name || 'Unknown';
       
@@ -92,6 +92,15 @@ export default function CustomerAnalyticsPage() {
     };
   }, [loans]);
 
+  // Destructure metrics for easier access
+  const {
+    sortedCustomers,
+    topCustomers,
+    totalCustomers,
+    repeatCustomers,
+    avgLoansPerCustomer,
+  } = metrics;
+
   const handleDownloadCSV = () => {
     try {
       const csvData = metrics.sortedCustomers.map((c) => ({
@@ -117,7 +126,6 @@ export default function CustomerAnalyticsPage() {
 
   if (error) {
     return <ErrorState message="Failed to fetch customer analytics data. Please ensure the backend server is running." onRetry={() => refetch()} />;
-  }
   }
 
   return (

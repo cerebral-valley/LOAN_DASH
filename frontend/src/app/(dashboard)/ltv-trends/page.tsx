@@ -23,17 +23,17 @@ export default function LTVTrendsPage() {
 
   // Calculate LTV metrics
   const metrics = useMemo(() => {
-    const metrics.avgLTV = loans.length > 0
+    const avgLTV = loans.length > 0
       ? loans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / loans.length
       : 0;
 
-    const metrics.activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
-    const metrics.avgActiveLTV = metrics.activeLoans.length > 0
-      ? metrics.activeLoans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / metrics.activeLoans.length
+    const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
+    const avgActiveLTV = activeLoans.length > 0
+      ? activeLoans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / activeLoans.length
       : 0;
 
-    const metrics.highLTVLoans = loans.filter((loan) => (loan.ltv_given || 0) > 80);
-    const metrics.lowLTVLoans = loans.filter((loan) => (loan.ltv_given || 0) <= 60);
+    const highLTVLoans = loans.filter((loan) => (loan.ltv_given || 0) > 80);
+    const lowLTVLoans = loans.filter((loan) => (loan.ltv_given || 0) <= 60);
 
     // LTV distribution
     const ltvRanges = [
@@ -44,7 +44,7 @@ export default function LTVTrendsPage() {
       { label: '86-100%', min: 86, max: 100 },
     ];
 
-    const metrics.ltvDistribution = ltvRanges.map((range) => {
+    const ltvDistribution = ltvRanges.map((range) => {
       const loansInRange = loans.filter(
         (loan) => (loan.ltv_given || 0) >= range.min && (loan.ltv_given || 0) <= range.max
       );

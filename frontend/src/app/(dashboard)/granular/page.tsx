@@ -89,18 +89,18 @@ export default function GranularPage() {
 
   // Calculate metrics
   const metrics = useMemo(() => {
-    const metrics.totalAmount = sumLoanAmounts(filteredLoans);
-    const metrics.totalCount = filteredLoans.length;
-    const metrics.averageAmount = calculateAverageAmount(filteredLoans);
+    const totalAmount = sumLoanAmounts(filteredLoans);
+    const totalCount = filteredLoans.length;
+    const averageAmount = calculateAverageAmount(filteredLoans);
     const active = filteredLoans.filter((loan) => loan.released !== 'TRUE');
-    const metrics.totalOutstanding = sumOutstanding(active);
+    const totalOutstanding = sumOutstanding(active);
 
     return {
-      metrics.totalAmount,
-      metrics.totalCount,
-      metrics.averageAmount,
-      metrics.activeLoans: active,
-      metrics.totalOutstanding,
+      totalAmount,
+      totalCount,
+      averageAmount,
+      activeLoans: active,
+      totalOutstanding,
     };
   }, [filteredLoans]);
 
