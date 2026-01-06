@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Download, DollarSign, TrendingUp, Calendar } from 'lucide-react';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
 
 interface GoldSilverRate {
   rate_date: string;
@@ -45,7 +47,7 @@ export default function RatesPage() {
   const [latestRate, setLatestRate] = useState<GoldSilverRate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useMemo(() => {
+  useEffect(() => {
     // Mock data since we don't have a backend endpoint for this yet
     // In production, this would call an API endpoint
     const mockRates = MOCK_GOLD_SILVER_RATES;
@@ -68,36 +70,12 @@ export default function RatesPage() {
       'Silver (GST)': rate.ngp_gst_silver
     }));
 
-    const csvString = [
-      Object.keys(csvContent[0]).join(','),
-      ...csvContent.map((row) =>
-        Object.values(row).join(',')
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'gold-silver-rates.csv';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    exportToCSV(csvContent, 'gold-silver-rates.csv');
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading gold & silver rates...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
-
-  if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
           <CardHeader>
             <CardTitle>Connection Error</CardTitle>
             <CardDescription>{error}</CardDescription>

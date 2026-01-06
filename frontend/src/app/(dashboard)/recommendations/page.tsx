@@ -4,10 +4,10 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLoans } from '@/lib/queries';
+import { Loan } from '@/lib/api';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
-import { loanApi } from '@/lib/api';
 import { Download, Lightbulb, AlertCircle, TrendingUp, Users, DollarSign, Target } from 'lucide-react';
 
 interface Recommendation {
@@ -30,124 +30,98 @@ interface PortfolioMetrics {
 }
 
 export default function RecommendationsPage() {
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loansData = [], isLoading, error, refetch } = useLoans();
 
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { metrics, recommendations } = useMemo(() => {
+    // Calculate metrics
+    const activeLoans = loansData.filter((loan) => loan.released !== 'TRUE');
+    const totalDisbursed = loansData.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+    const totalOutstanding = activeLoans.reduce((sum, loan) => sum + (loan.pending_loan_amount || 0), 0);
+    const collectionEfficiency = totalDisbursed > 0 
+      ? ((totalDisbursed - totalOutstanding) / totalDisbursed) * 100 
+      : 0;
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getAll();
-      const loansData = response.data;
+    const portfolioMetrics: PortfolioMetrics = {
+      totalLoans: loansData.length,
+      activeLoans: activeLoans.length,
+      totalOutstanding,
+      collectionEfficiency,
+      portfolioYield: 0, // Simplified for now
+      averageLTV: 0, // Simplified for now
+    };
 
-      // Calculate metrics
-      const activeLoans = loansData.filter((loan) => loan.released !== 'TRUE');
-      const totalDisbursed = loansData.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-      const totalOutstanding = activeLoans.reduce((sum, loan) => sum + (loan.pending_loan_amount || 0), 0);
-      const collectionEfficiency = totalDisbursed > 0 
-        ? ((totalDisbursed - totalOutstanding) / totalDisbursed) * 100 
-        : 0;
+    // Generate recommendations based on metrics
+    const generateRecommendations = (metrics: PortfolioMetrics, allLoans: Loan[], activeLoans: Loan[]) => {
+      const recs: Recommendation[] = [];
 
-      const portfolioMetrics: PortfolioMetrics = {
-        totalLoans: loansData.length,
-        activeLoans: activeLoans.length,
-        totalOutstanding,
-        collectionEfficiency,
-        portfolioYield: 0, // Simplified for now
-        averageLTV: 0, // Simplified for now
-      };
-
-      setMetrics(portfolioMetrics);
-
-      // Generate recommendations based on metrics
-      generateRecommendations(portfolioMetrics, loansData, activeLoans);
-
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateRecommendations = (metrics: PortfolioMetrics, allLoans: Loan[], activeLoans: Loan[]) => {
-    const recs: Recommendation[] = [];
-
-    // Collection Efficiency Recommendation
-    if (metrics.collectionEfficiency < 85) {
-      recs.push({
-        id: 'collection-1',
-        category: 'Loan Quality',
-        priority: 'HIGH',
-        title: 'Improve Collection Efficiency',
-        currentState: `Current collection efficiency is ${metrics.collectionEfficiency.toFixed(1)}% (Target: 92%+)`,
-        impact: 'Improving collection to 92% could free up ₹' + ((metrics.totalOutstanding * 0.07) / 1000000).toFixed(2) + 'M in capital',
-        actions: [
-          'Implement automated payment reminders 7 days before due date',
-          'Offer early payment incentives (0.5% interest discount)',
-          'Review and tighten lending criteria for new loans',
-          'Focus collection efforts on largest outstanding loans',
-          'Consider restructuring chronic delayed accounts'
-        ]
-      });
-    } else if (metrics.collectionEfficiency < 92) {
-      recs.push({
-        id: 'collection-2',
-        category: 'Loan Quality',
-        priority: 'MEDIUM',
-        title: 'Optimize Collection Process',
-        currentState: `Collection efficiency is ${metrics.collectionEfficiency.toFixed(1)}% (Good, but can improve to 92%+)`,
-        impact: 'Reaching 92% efficiency target improves cash flow and reduces risk',
-        actions: [
-          'Analyze which customer segments have best repayment rates',
-          'Implement tiered follow-up strategy based on loan size',
-          'Provide online/app-based repayment options',
-          'Track and reward loan officers with best collection rates'
-        ]
-      });
-    }
-
-    // Active Loans Monitoring
-    if (activeLoans.length > 0) {
-      const avgOutstanding = metrics.totalOutstanding / activeLoans.length;
-      recs.push({
-        id: 'active-monitoring',
-        category: 'Portfolio Management',
-        priority: 'MEDIUM',
-        title: 'Active Loan Portfolio Monitoring',
-        currentState: `${activeLoans.length} active loans with average outstanding of ₹${avgOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
-        impact: 'Regular monitoring prevents defaults and identifies at-risk accounts early',
-        actions: [
-          'Weekly review of all loans approaching maturity (within 30 days)',
-          'Monthly aging analysis to flag overdue accounts',
-          'Contact customers 15 days before loan expiry for renewal or release',
-          'Set up dashboard alerts for high-value loans (>₹2L)',
-          'Quarterly review of overall portfolio health metrics'
-        ]
-      });
-    }
-
-    // Customer Diversification
-    const customerMap = new Map<string, number>();
-    allLoans.forEach((loan) => {
-      if (loan.customer_name) {
-        const current = customerMap.get(loan.customer_name) || 0;
-        customerMap.set(loan.customer_name, current + (loan.loan_amount || 0));
+      // Collection Efficiency Recommendation
+      if (metrics.collectionEfficiency < 85) {
+        recs.push({
+          id: 'collection-1',
+          category: 'Loan Quality',
+          priority: 'HIGH',
+          title: 'Improve Collection Efficiency',
+          currentState: `Current collection efficiency is ${metrics.collectionEfficiency.toFixed(1)}% (Target: 92%+)`,
+          impact: 'Improving collection to 92% could free up ₹' + ((metrics.totalOutstanding * 0.07) / 1000000).toFixed(2) + 'M in capital',
+          actions: [
+            'Implement automated payment reminders 7 days before due date',
+            'Offer early payment incentives (0.5% interest discount)',
+            'Review and tighten lending criteria for new loans',
+            'Focus collection efforts on largest outstanding loans',
+            'Consider restructuring chronic delayed accounts'
+          ]
+        });
+      } else if (metrics.collectionEfficiency < 92) {
+        recs.push({
+          id: 'collection-2',
+          category: 'Loan Quality',
+          priority: 'MEDIUM',
+          title: 'Optimize Collection Process',
+          currentState: `Collection efficiency is ${metrics.collectionEfficiency.toFixed(1)}% (Good, but can improve to 92%+)`,
+          impact: 'Reaching 92% efficiency target improves cash flow and reduces risk',
+          actions: [
+            'Analyze which customer segments have best repayment rates',
+            'Implement tiered follow-up strategy based on loan size',
+            'Provide online/app-based repayment options',
+            'Track and reward loan officers with best collection rates'
+          ]
+        });
       }
-    });
 
-    const totalCapital = allLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-    const topCustomers = Array.from(customerMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-    const top5Concentration = topCustomers.reduce((sum, [, amount]) => sum + amount, 0);
+      // Active Loans Monitoring
+      if (activeLoans.length > 0) {
+        const avgOutstanding = metrics.totalOutstanding / activeLoans.length;
+        recs.push({
+          id: 'active-monitoring',
+          category: 'Portfolio Management',
+          priority: 'MEDIUM',
+          title: 'Active Loan Portfolio Monitoring',
+          currentState: `${activeLoans.length} active loans with average outstanding of ₹${avgOutstanding.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+          impact: 'Regular monitoring prevents defaults and identifies at-risk accounts early',
+          actions: [
+            'Weekly review of all loans approaching maturity (within 30 days)',
+            'Monthly aging analysis to flag overdue accounts',
+            'Contact customers 15 days before loan expiry for renewal or release',
+            'Set up dashboard alerts for high-value loans (>₹2L)',
+            'Quarterly review of overall portfolio health metrics'
+          ]
+        });
+      }
+
+      // Customer Diversification
+      const customerMap = new Map<string, number>();
+      allLoans.forEach((loan) => {
+        if (loan.customer_name) {
+          const current = customerMap.get(loan.customer_name) || 0;
+          customerMap.set(loan.customer_name, current + (loan.loan_amount || 0));
+        }
+      });
+
+      const totalCapital = allLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+      const topCustomers = Array.from(customerMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      const top5Concentration = topCustomers.reduce((sum, [, amount]) => sum + amount, 0);
     const concentrationPct = totalCapital > 0 ? (top5Concentration / totalCapital) * 100 : 0;
 
     if (concentrationPct > 50) {
@@ -251,34 +225,34 @@ export default function RecommendationsPage() {
       });
     }
 
-    setRecommendations(recs);
+    return recs;
   };
 
-  const handleDownloadRecommendations = () => {
-    if (recommendations.length === 0) {
-      console.warn('No recommendations to export');
-      return;
-    }
+  const recs = generateRecommendations(portfolioMetrics, loansData, activeLoans);
 
-    const csvContent = recommendations.map((rec) => ({
-      Category: rec.category,
-      Priority: rec.priority,
-      Title: rec.title,
-      'Current State': rec.currentState,
-      Impact: rec.impact,
-      Actions: rec.actions.join('; ')
-    }));
-
-    const csvString = [
-      Object.keys(csvContent[0]).join(','),
-      ...csvContent.map((row) =>
-        Object.values(row).map((val) => `"${val}"`).join(',')
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    downloadCSV(blob, 'smart-recommendations.csv');
+  return {
+    metrics: portfolioMetrics,
+    recommendations: recs,
   };
+}, [loansData]);
+
+const handleDownloadRecommendations = () => {
+  if (recommendations.length === 0) {
+    console.warn('No recommendations to export');
+    return;
+  }
+
+  const csvContent = recommendations.map((rec) => ({
+    Category: rec.category,
+    Priority: rec.priority,
+    Title: rec.title,
+    'Current State': rec.currentState,
+    Impact: rec.impact,
+    Actions: rec.actions.join('; ')
+  }));
+
+  exportToCSV(csvContent, 'smart-recommendations.csv');
+};
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -306,28 +280,12 @@ export default function RecommendationsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading smart recommendations...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
