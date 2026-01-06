@@ -295,27 +295,12 @@ try:
         # Total interest = Released + Active deposits
         total_interest = interest_from_released + interest_from_active
         
-        # Previous period calculation for comparison (if enabled)
-        if compare_previous:
-            # For previous period, we need to look at what was the state at that time
-            # This is a simplified comparison - just using the same logic
-            prev_released_loans = filtered_df[filtered_df['released'] == 'TRUE'].copy()
-            prev_interest_from_released = prev_released_loans['interest_amount'].sum()
-            
-            prev_active_loans = filtered_df[filtered_df['released'] == 'FALSE'].copy()
-            prev_interest_from_active = prev_active_loans['interest_deposited_till_date'].sum()
-            
-            prev_interest = prev_interest_from_released + prev_interest_from_active
-            interest_growth = ((total_interest - prev_interest) / prev_interest * 100) if prev_interest > 0 else 0
-        else:
-            interest_growth = 0
-        
         collection_rate = (total_interest / (total_disbursed * 0.12) * 100) if total_disbursed > 0 else 0
         st.metric(
             "💵 Interest Received",
             f"₹{total_interest/1_000:.0f}K",
-            f"{interest_growth:+.1f}%" if compare_previous else None,
-            delta_color="normal" if interest_growth >= 0 else "inverse"
+            None,  # No period comparison for cumulative interest
+            delta_color="normal"
         )
         st.caption(f"Collection: {collection_rate:.1f}%")
 

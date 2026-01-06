@@ -30,8 +30,8 @@ interface AgingMetrics {
 }
 
 export default function AgingPage() {
-  // Fetch all active loans without pagination limit
-  const { data: loans = [], isLoading, error, refetch } = useActiveLoans(1, 999999);
+  // Fetch all active loans (default limit is 1000)
+  const { data: loans = [], isLoading, error, refetch } = useActiveLoans();
 
   // Calculate aging metrics
   const agingMetrics = useMemo(() => {
