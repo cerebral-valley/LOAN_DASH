@@ -44,4 +44,3 @@ export function exportToCSV(data: Record<string, unknown>[], filename: string): 
   // Clean up the URL
   URL.revokeObjectURL(url);
 }
-

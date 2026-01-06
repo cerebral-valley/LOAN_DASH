@@ -2,10 +2,12 @@ import { Loan } from './api';
 
 /**
  * Calculate the number of days between disbursement and release dates
+ * Returns 0 if release date is before disbursement date
  */
 export function calculateDaysToRelease(disbursement: Date, release: Date): number {
   const diff = release.getTime() - disbursement.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return days < 0 ? 0 : days;
 }
 
 /**
@@ -20,7 +22,14 @@ export function calculateAgeBucket(days: number): string {
 }
 
 /**
- * Calculate weighted average for a given value extractor function
+ * Calculate weighted average for loans
+ * @param loans - Array of loans to calculate weighted average for
+ * @param getValue - Function that extracts the value to be weighted (e.g., days held, interest rate)
+ * @param getWeight - Function that extracts the weight for each loan (typically loan amount)
+ * @returns The weighted average value, or 0 if total weight is 0
+ * 
+ * Example: Calculate weighted average holding period
+ * calculateWeightedAverage(loans, (loan) => holdingDays, (loan) => loan.loan_amount || 0)
  */
 export function calculateWeightedAverage(
   loans: Loan[],
