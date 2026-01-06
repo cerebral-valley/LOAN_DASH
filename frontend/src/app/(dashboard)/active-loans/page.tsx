@@ -8,6 +8,9 @@ import { loanApi, downloadCSV } from '@/lib/api';
 import { useVyapariCustomers, useLoansByCustomer } from '@/lib/queries';
 import { Download, Search, Building, AlertCircle } from 'lucide-react';
 
+// Constants
+const SEARCH_DEBOUNCE_DELAY = 300;
+
 // Debounce hook for search optimization
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -30,7 +33,7 @@ export default function ActiveLoansPage() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Use debounced search for better performance
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedSearchTerm = useDebounce(searchTerm, SEARCH_DEBOUNCE_DELAY);
 
   // Use React Query hooks for data fetching with automatic caching
   const { data: vyapariCustomers = [], isLoading: loading, error, refetch: fetchCustomers } = useVyapariCustomers();

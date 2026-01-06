@@ -5,6 +5,8 @@ import Redis from 'ioredis';
  * Falls back to in-memory cache if Redis is not available
  */
 
+const MILLISECONDS_PER_SECOND = 1000;
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -85,7 +87,7 @@ class RedisCache {
     if (!entry) return null;
 
     const now = Date.now();
-    if (now - entry.timestamp > this.defaultTTL * 1000) {
+    if (now - entry.timestamp > this.defaultTTL * MILLISECONDS_PER_SECOND) {
       this.inMemoryCache.delete(key);
       return null;
     }

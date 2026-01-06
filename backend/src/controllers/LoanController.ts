@@ -300,7 +300,7 @@ export class LoanController {
     try {
       // Check cache first
       const cacheKey = 'overview_stats';
-      const cachedStats = cache.get(cacheKey);
+      const cachedStats = await cache.get(cacheKey);
       if (cachedStats) {
         return res.json(cachedStats);
       }
@@ -333,7 +333,7 @@ export class LoanController {
         .getRawMany();
 
       // Transform to object format
-      const loansByDateObj = loansByDate.reduce((acc: any, row) => {
+      const loansByDateObj = loansByDate.reduce((acc: Record<string, { disbursed: number; count: number }>, row) => {
         acc[row.date] = {
           disbursed: parseFloat(row.disbursed) || 0,
           count: parseInt(row.count) || 0,
@@ -351,7 +351,7 @@ export class LoanController {
       };
 
       // Store in cache
-      cache.set(cacheKey, result);
+      await cache.set(cacheKey, result);
 
       res.json(result);
     } catch (error) {
