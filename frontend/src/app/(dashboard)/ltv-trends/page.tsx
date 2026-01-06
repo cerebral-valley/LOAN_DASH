@@ -23,19 +23,19 @@ export default function LTVTrendsPage() {
 
   // Calculate LTV metrics
   const metrics = useMemo(() => {
-    const avgLTV = loans.length > 0
-      ? loans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / loans.length
-      : 0;
-
+    // Focus on active loans for LTV analysis
     const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
-    const avgActiveLTV = activeLoans.length > 0
+    
+    const avgLTV = activeLoans.length > 0
       ? activeLoans.reduce((sum, loan) => sum + (loan.ltv_given || 0), 0) / activeLoans.length
       : 0;
 
-    const highLTVLoans = loans.filter((loan) => (loan.ltv_given || 0) > 80);
-    const lowLTVLoans = loans.filter((loan) => (loan.ltv_given || 0) <= 60);
+    const avgActiveLTV = avgLTV; // Same as above since we're already filtering active loans
 
-    // LTV distribution
+    const highLTVLoans = activeLoans.filter((loan) => (loan.ltv_given || 0) > 80);
+    const lowLTVLoans = activeLoans.filter((loan) => (loan.ltv_given || 0) <= 60);
+
+    // LTV distribution (active loans only)
     const ltvRanges = [
       { label: '0-40%', min: 0, max: 40 },
       { label: '41-60%', min: 41, max: 60 },
@@ -45,7 +45,7 @@ export default function LTVTrendsPage() {
     ];
 
     const ltvDistribution = ltvRanges.map((range) => {
-      const loansInRange = loans.filter(
+      const loansInRange = activeLoans.filter(
         (loan) => (loan.ltv_given || 0) >= range.min && (loan.ltv_given || 0) <= range.max
       );
       const totalAmount = loansInRange.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
@@ -56,12 +56,12 @@ export default function LTVTrendsPage() {
         count: loansInRange.length,
         totalAmount,
         avgLoanSize,
-        percentage: loans.length > 0 ? (loansInRange.length / loans.length) * 100 : 0,
+        percentage: activeLoans.length > 0 ? (loansInRange.length / activeLoans.length) * 100 : 0,
       };
     });
 
-    // Sort loans by LTV
-    const sortedByLTV = [...loans].sort((a, b) => (b.ltv_given || 0) - (a.ltv_given || 0));
+    // Sort active loans by LTV
+    const sortedByLTV = [...activeLoans].sort((a, b) => (b.ltv_given || 0) - (a.ltv_given || 0));
 
     return {
       avgLTV,

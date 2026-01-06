@@ -30,7 +30,8 @@ interface AgingMetrics {
 }
 
 export default function AgingPage() {
-  const { data: loans = [], isLoading, error, refetch } = useActiveLoans();
+  // Fetch all active loans without pagination limit
+  const { data: loans = [], isLoading, error, refetch } = useActiveLoans(1, 999999);
 
   // Calculate aging metrics
   const agingMetrics = useMemo(() => {
@@ -196,7 +197,7 @@ export default function AgingPage() {
                       <TableCell className="font-medium">{bucket.label}</TableCell>
                       <TableCell className="text-right">{bucket.loans.length}</TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(totalOutstanding)}
+                        {formatCurrency(Math.round(totalOutstanding))}
                       </TableCell>
                       <TableCell className="text-right">
                         {((bucket.loans.length / loans.length) * 100).toFixed(1)}%
@@ -241,7 +242,7 @@ export default function AgingPage() {
                       {formatCurrency(aging.loanAmount)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(aging.outstanding)}
+                      {formatCurrency(Math.round(aging.outstanding))}
                     </TableCell>
                     <TableCell className="text-right font-bold">{aging.ageInDays}</TableCell>
                     <TableCell>

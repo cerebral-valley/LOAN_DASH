@@ -53,10 +53,16 @@ export default function CustomerAnalyticsPage() {
 
       acc[customerId].totalLoans++;
       acc[customerId].totalBorrowed += loan.loan_amount || 0;
-      acc[customerId].totalOutstanding += loan.pending_loan_amount || 0;
-      acc[customerId].totalInterestPaid += loan.interest_deposited_till_date || 0;
-      if (!isLoanReleased(loan.released)) {
+      
+      // Only add outstanding for active loans (released = FALSE)
+      if (loan.released !== 'TRUE') {
+        acc[customerId].totalOutstanding += loan.pending_loan_amount || 0;
         acc[customerId].activeLoans++;
+        // For active loans, use interest_deposited_till_date
+        acc[customerId].totalInterestPaid += loan.interest_deposited_till_date || 0;
+      } else {
+        // For released loans, use interest_amount
+        acc[customerId].totalInterestPaid += loan.interest_amount || 0;
       }
 
       return acc;
@@ -226,7 +232,7 @@ export default function CustomerAnalyticsPage() {
                       ₹{customer.totalBorrowed.toLocaleString('en-IN')}
                     </TableCell>
                     <TableCell className="text-right">
-                      ₹{customer.totalOutstanding.toLocaleString('en-IN')}
+                      ₹{Math.round(customer.totalOutstanding).toLocaleString('en-IN')}
                     </TableCell>
                     <TableCell className="text-right">
                       ₹{customer.totalInterestPaid.toLocaleString('en-IN')}
