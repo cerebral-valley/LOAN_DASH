@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { useDownloadLoanCSV } from '@/lib/hooks';
 import { Download, Calendar } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface MonthlyData {
   [year: string]: {
@@ -22,109 +25,65 @@ const MONTHS = [
 ];
 
 export default function YearlyPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [disbursedData, setDisbursedData] = useState<MonthlyData>({});
-  const [releasedData, setReleasedData] = useState<MonthlyData>({});
-  const [years, setYears] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { download: downloadCSV } = useDownloadLoanCSV();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Process disbursed and released data
+  const { disbursedData, releasedData, years } = useMemo(() => {
+    const disbursed: MonthlyData = {};
+    const released: MonthlyData = {};
+    const yearSet = new Set<string>();
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getAll();
-      const loansData = response.data;
-      setLoans(loansData);
+    loans.forEach((loan) => {
+      // Process disbursement
+      if (loan.date_of_disbursement) {
+        const date = new Date(loan.date_of_disbursement);
+        const year = date.getFullYear().toString();
+        const month = MONTHS[date.getMonth()];
+        
+        yearSet.add(year);
+        
+        if (!disbursed[year]) disbursed[year] = {};
+        if (!disbursed[year][month]) disbursed[year][month] = { amount: 0, count: 0 };
+        
+        disbursed[year][month].amount += loan.loan_amount || 0;
+        disbursed[year][month].count += 1;
+      }
 
-      // Process disbursed data
-      const disbursed: MonthlyData = {};
-      const released: MonthlyData = {};
-      const yearSet = new Set<string>();
+      // Process release
+      if (loan.date_of_release && loan.released === 'TRUE') {
+        const date = new Date(loan.date_of_release);
+        const year = date.getFullYear().toString();
+        const month = MONTHS[date.getMonth()];
+        
+        yearSet.add(year);
+        
+        if (!released[year]) released[year] = {};
+        if (!released[year][month]) released[year][month] = { amount: 0, count: 0 };
+        
+        released[year][month].amount += loan.loan_amount || 0;
+        released[year][month].count += 1;
+      }
+    });
 
-      loansData.forEach((loan) => {
-        // Process disbursement
-        if (loan.date_of_disbursement) {
-          const date = new Date(loan.date_of_disbursement);
-          const year = date.getFullYear().toString();
-          const month = MONTHS[date.getMonth()];
-          
-          yearSet.add(year);
-          
-          if (!disbursed[year]) disbursed[year] = {};
-          if (!disbursed[year][month]) disbursed[year][month] = { amount: 0, count: 0 };
-          
-          disbursed[year][month].amount += loan.loan_amount || 0;
-          disbursed[year][month].count += 1;
-        }
-
-        // Process release
-        if (loan.date_of_release && loan.released === 'TRUE') {
-          const date = new Date(loan.date_of_release);
-          const year = date.getFullYear().toString();
-          const month = MONTHS[date.getMonth()];
-          
-          yearSet.add(year);
-          
-          if (!released[year]) released[year] = {};
-          if (!released[year][month]) released[year][month] = { amount: 0, count: 0 };
-          
-          released[year][month].amount += loan.loan_amount || 0;
-          released[year][month].count += 1;
-        }
-      });
-
-      setDisbursedData(disbursed);
-      setReleasedData(released);
-      setYears(Array.from(yearSet).sort());
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadCSV = async () => {
-    try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'yearly-breakdown.csv');
-    } catch (err) {
-      console.error('Error downloading CSV:', err);
-    }
-  };
+    return {
+      disbursedData: disbursed,
+      releasedData: released,
+      years: Array.from(yearSet).sort(),
+    };
+  }, [loans]);
 
   const calculateYearTotal = (data: MonthlyData, year: string, type: 'amount' | 'count') => {
     if (!data[year]) return 0;
     return Object.values(data[year]).reduce((sum, month) => sum + month[type], 0);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading yearly breakdown...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -136,7 +95,7 @@ export default function YearlyPage() {
             Monthly analysis of loan disbursements and releases by year
           </p>
         </div>
-        <Button onClick={handleDownloadCSV} variant="outline">
+        <Button onClick={() => downloadCSV('yearly-breakdown.csv')} variant="outline">
           <Download className="mr-2 h-4 w-4" />
           Export CSV
         </Button>
