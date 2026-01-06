@@ -148,12 +148,23 @@ export interface ExpenseStats {
   bankExpenses: number;
 }
 
+// API response types
+interface PaginatedResponse<T> {
+  data?: T[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 // Loan API calls
 export const loanApi = {
   getAll: async (page = 1, limit = 1000) => {
-    const response = await api.get<any>(`/loans?page=${page}&limit=${limit}`);
+    const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
-    const data = response.data.data || response.data;
+    const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
@@ -162,30 +173,30 @@ export const loanApi = {
     return { ...response, data: transformLoan(response.data) };
   },
   getActive: async (page = 1, limit = 1000) => {
-    const response = await api.get<any>(`/loans/active?page=${page}&limit=${limit}`);
+    const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/active?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
-    const data = response.data.data || response.data;
+    const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
   getReleased: async (page = 1, limit = 1000) => {
-    const response = await api.get<any>(`/loans/released?page=${page}&limit=${limit}`);
+    const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/released?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
-    const data = response.data.data || response.data;
+    const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
   getByCustomerType: async (type: string, page = 1, limit = 1000) => {
-    const response = await api.get<any>(`/loans/customer-type/${type}?page=${page}&limit=${limit}`);
+    const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/customer-type/${type}?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
-    const data = response.data.data || response.data;
+    const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
   getByCustomer: async (customerName: string, page = 1, limit = 1000) => {
-    const response = await api.get<any>(`/loans/customer/${customerName}?page=${page}&limit=${limit}`);
+    const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/customer/${customerName}?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
-    const data = response.data.data || response.data;
+    const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
@@ -201,9 +212,9 @@ export const loanApi = {
 // Expense API calls
 export const expenseApi = {
   getAll: async (page = 1, limit = 1000) => {
-    const response = await api.get<any>(`/expenses?page=${page}&limit=${limit}`);
+    const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/expenses?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
-    const data = response.data.data || response.data;
+    const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const expenses = Array.isArray(data) ? data : [];
     return { ...response, data: expenses.map(transformExpense) };
   },

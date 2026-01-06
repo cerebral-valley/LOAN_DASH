@@ -1,33 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loanApi, LoanStats, downloadCSV } from '@/lib/api';
+import { loanApi, downloadCSV } from '@/lib/api';
+import { useLoanStats } from '@/lib/queries';
 import { Download, TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<LoanStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getStats();
-      setStats(response.data);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch statistics. Please ensure the backend server is running.');
-      console.error('Error fetching stats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: stats, isLoading: loading, error, refetch: fetchStats } = useLoanStats();
 
   const handleDownloadCSV = async () => {
     try {
@@ -37,6 +18,12 @@ export default function DashboardPage() {
       console.error('Error downloading CSV:', err);
     }
   };
+
+  // Memoize computed values to prevent unnecessary recalculations
+  const errorMessage = useMemo(() => {
+    if (!error) return null;
+    return 'Failed to fetch statistics. Please ensure the backend server is running.';
+  }, [error]);
 
   if (loading) {
     return (
@@ -52,10 +39,10 @@ export default function DashboardPage() {
         <Card className="border-destructive">
           <CardHeader>
             <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
+            <CardDescription>{errorMessage}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={fetchStats}>Retry</Button>
+            <Button onClick={() => fetchStats()}>Retry</Button>
           </CardContent>
         </Card>
       </div>

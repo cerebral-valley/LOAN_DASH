@@ -7,6 +7,7 @@ import { initializeDatabase } from './config/database';
 import { runMigrations } from './migrations/runMigrations';
 import loanRoutes from './routes/loanRoutes';
 import expenseRoutes from './routes/expenseRoutes';
+import { etagMiddleware } from './utils/cacheMiddleware';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -16,6 +17,9 @@ app.use(cors());
 app.use(compression()); // Enable gzip compression for responses
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Add ETag middleware for HTTP caching
+app.use(etagMiddleware);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
