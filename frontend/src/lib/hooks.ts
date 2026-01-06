@@ -15,8 +15,8 @@ export function useDownloadLoanCSV() {
       const response = await loanApi.downloadCSV();
       downloadCSV(response.data, filename);
     } catch (err) {
-      setError('Failed to download CSV');
-      console.error('Error downloading CSV:', err);
+      setError('Failed to download loan CSV');
+      console.error('Error downloading loan CSV:', err);
     } finally {
       setIsDownloading(false);
     }
@@ -39,8 +39,8 @@ export function useDownloadExpenseCSV() {
       const response = await expenseApi.downloadCSV();
       downloadCSV(response.data, filename);
     } catch (err) {
-      setError('Failed to download CSV');
-      console.error('Error downloading CSV:', err);
+      setError('Failed to download expense CSV');
+      console.error('Error downloading expense CSV:', err);
     } finally {
       setIsDownloading(false);
     }

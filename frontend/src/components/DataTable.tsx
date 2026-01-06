@@ -18,6 +18,11 @@ export interface ColumnDefinition<T = Record<string, unknown>> {
   key: string;
   label: string;
   format?: 'text' | 'currency' | 'date' | 'percentage' | 'number';
+  /**
+   * Custom formatter function for display.
+   * Note: If formatter returns React.ReactNode (JSX), CSV export will convert it to string.
+   * For best CSV results, return string or number from formatter.
+   */
   formatter?: (value: unknown, row: T) => string | number | React.ReactNode;
   sortable?: boolean;
   width?: string;
