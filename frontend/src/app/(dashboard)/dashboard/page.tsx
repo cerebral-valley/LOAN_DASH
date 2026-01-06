@@ -3,9 +3,14 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loanApi, downloadCSV } from '@/lib/api';
+import { loanApi } from '@/lib/api';
 import { useLoanStats } from '@/lib/queries';
 import { Download, TrendingUp, TrendingDown, DollarSign, Activity } from 'lucide-react';
+import { formatCurrency, formatPercentage } from '@/lib/formatting-utils';
+import { exportToCSV } from '@/lib/csv-utils';
+import { calculateCollectionRate, calculateInterestToPrincipalRatio } from '@/lib/aggregation-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 export default function DashboardPage() {
   const { data: stats, isLoading: loading, error, refetch: fetchStats } = useLoanStats();
@@ -13,7 +18,7 @@ export default function DashboardPage() {
   const handleDownloadCSV = async () => {
     try {
       const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'loans.csv');
+      exportToCSV(response.data, 'loans.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
@@ -25,28 +30,22 @@ export default function DashboardPage() {
     return 'Failed to fetch statistics. Please ensure the backend server is running.';
   }, [error]);
 
+  const collectionRate = useMemo(() => {
+    if (!stats) return 0;
+    return calculateCollectionRate(stats.totalDisbursed, stats.totalOutstanding);
+  }, [stats]);
+
+  const interestToPrincipalRatio = useMemo(() => {
+    if (!stats) return 0;
+    return calculateInterestToPrincipalRatio(stats.totalInterestReceived, stats.totalDisbursed);
+  }, [stats]);
+
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{errorMessage}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => fetchStats()}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message={errorMessage || 'An error occurred'} onRetry={() => fetchStats()} />;
   }
 
   return (
@@ -85,7 +84,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{stats?.totalDisbursed.toLocaleString('en-IN') || 0}
+              {formatCurrency(stats?.totalDisbursed)}
             </div>
             <p className="text-xs text-muted-foreground">Lifetime disbursement</p>
           </CardContent>
@@ -98,7 +97,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{stats?.totalOutstanding.toLocaleString('en-IN') || 0}
+              {formatCurrency(stats?.totalOutstanding)}
             </div>
             <p className="text-xs text-muted-foreground">Current pending amount</p>
           </CardContent>
@@ -111,7 +110,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{stats?.totalInterestReceived.toLocaleString('en-IN') || 0}
+              {formatCurrency(stats?.totalInterestReceived)}
             </div>
             <p className="text-xs text-muted-foreground">Total interest collected</p>
           </CardContent>
@@ -126,9 +125,9 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{stats?.activeLoans || 0}</div>
             <p className="text-xs text-muted-foreground">
               {stats?.totalLoans
-                ? ((stats.activeLoans / stats.totalLoans) * 100).toFixed(1)
-                : 0}
-              % of total loans
+                ? formatPercentage((stats.activeLoans / stats.totalLoans) * 100, 1)
+                : '0%'}
+              {' of total loans'}
             </p>
           </CardContent>
         </Card>
@@ -140,14 +139,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats?.totalDisbursed
-                ? (
-                    ((stats.totalDisbursed - stats.totalOutstanding) /
-                      stats.totalDisbursed) *
-                    100
-                  ).toFixed(1)
-                : 0}
-              %
+              {formatPercentage(collectionRate, 1)}
             </div>
             <p className="text-xs text-muted-foreground">Principal recovery rate</p>
           </CardContent>
@@ -167,36 +159,23 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Average Loan Amount</span>
                 <span className="text-sm text-muted-foreground">
-                  ₹
                   {stats?.totalLoans
-                    ? (stats.totalDisbursed / stats.totalLoans).toLocaleString(
-                        'en-IN',
-                        { maximumFractionDigits: 0 }
-                      )
-                    : 0}
+                    ? formatCurrency(stats.totalDisbursed / stats.totalLoans)
+                    : formatCurrency(0)}
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Average Outstanding</span>
                 <span className="text-sm text-muted-foreground">
-                  ₹
                   {stats?.activeLoans
-                    ? (stats.totalOutstanding / stats.activeLoans).toLocaleString(
-                        'en-IN',
-                        { maximumFractionDigits: 0 }
-                      )
-                    : 0}
+                    ? formatCurrency(stats.totalOutstanding / stats.activeLoans)
+                    : formatCurrency(0)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Interest to Principal Ratio</span>
                 <span className="text-sm text-muted-foreground">
-                  {stats?.totalDisbursed
-                    ? ((stats.totalInterestReceived / stats.totalDisbursed) * 100).toFixed(
-                        2
-                      )
-                    : 0}
-                  %
+                  {formatPercentage(interestToPrincipalRatio)}
                 </span>
               </div>
             </div>

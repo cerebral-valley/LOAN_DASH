@@ -4,8 +4,14 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, VyapariCustomer, downloadCSV } from '@/lib/api';
+import { loanApi, Loan, VyapariCustomer } from '@/lib/api';
 import { Download, Search, Filter } from 'lucide-react';
+import { extractUniqueYears, filterLoansByCustomerType, filterLoansByCustomer } from '@/lib/loan-utils';
+import { sumLoanAmounts, sumOutstanding, calculateAverageAmount } from '@/lib/aggregation-utils';
+import { formatCurrency, formatDate } from '@/lib/formatting-utils';
+import { exportToCSV } from '@/lib/csv-utils';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -54,16 +60,7 @@ export default function GranularPage() {
       setVyapariCustomers(customers);
 
       // Extract unique years
-      const yearSet = new Set<string>();
-      loansData.forEach((loan) => {
-        if (loan.date_of_disbursement) {
-          yearSet.add(new Date(loan.date_of_disbursement).getFullYear().toString());
-        }
-        if (loan.date_of_release) {
-          yearSet.add(new Date(loan.date_of_release).getFullYear().toString());
-        }
-      });
-      setYears(Array.from(yearSet).sort());
+      setYears(extractUniqueYears(loansData));
 
       setError(null);
     } catch (err) {
@@ -80,11 +77,9 @@ export default function GranularPage() {
     // Client filter
     if (selectedClient !== '--ALL--') {
       if (selectedClient === 'Private') {
-        filtered = filtered.filter(
-          (loan) => loan.customer_type?.toUpperCase().trim() !== 'VYAPARI'
-        );
+        filtered = filterLoansByCustomerType(filtered, 'private');
       } else {
-        filtered = filtered.filter((loan) => loan.customer_name === selectedClient);
+        filtered = filterLoansByCustomer(filtered, selectedClient);
       }
     }
 
@@ -129,41 +124,24 @@ export default function GranularPage() {
   const handleDownloadCSV = async () => {
     try {
       const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'granular-analysis.csv');
+      exportToCSV(response.data, 'granular-analysis.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
-  const totalAmount = filteredLoans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+  const totalAmount = sumLoanAmounts(filteredLoans);
   const totalCount = filteredLoans.length;
-  const averageAmount = totalCount > 0 ? totalAmount / totalCount : 0;
-  const totalOutstanding = filteredLoans
-    .filter((loan) => loan.released !== 'TRUE')
-    .reduce((sum, loan) => sum + (loan.pending_loan_amount || 0), 0);
+  const averageAmount = calculateAverageAmount(filteredLoans);
+  const activeLoans = filteredLoans.filter((loan) => loan.released !== 'TRUE');
+  const totalOutstanding = sumOutstanding(activeLoans);
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading granular analysis...</div>
-      </div>
-    );
+    return <LoadingState message="Loading granular analysis..." />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message={error} onRetry={fetchData} />;
   }
 
   return (
@@ -304,7 +282,7 @@ export default function GranularPage() {
             <Search className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalAmount.toLocaleString('en-IN')}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
             <p className="text-xs text-muted-foreground">Filtered total</p>
           </CardContent>
         </Card>
@@ -327,7 +305,7 @@ export default function GranularPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{averageAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              {formatCurrency(averageAmount, { showSymbol: true })}
             </div>
             <p className="text-xs text-muted-foreground">Per loan</p>
           </CardContent>
@@ -339,7 +317,7 @@ export default function GranularPage() {
             <Search className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{totalOutstanding.toLocaleString('en-IN')}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalOutstanding)}</div>
             <p className="text-xs text-muted-foreground">Pending amount</p>
           </CardContent>
         </Card>
@@ -381,17 +359,13 @@ export default function GranularPage() {
                             : 'Private'}
                         </TableCell>
                         <TableCell className="text-right">
-                          ₹{(loan.loan_amount || 0).toLocaleString('en-IN')}
+                          {formatCurrency(loan.loan_amount)}
                         </TableCell>
                         <TableCell>
-                          {loan.date_of_disbursement
-                            ? new Date(loan.date_of_disbursement).toLocaleDateString('en-IN')
-                            : '-'}
+                          {formatDate(loan.date_of_disbursement)}
                         </TableCell>
                         <TableCell>
-                          {loan.date_of_release
-                            ? new Date(loan.date_of_release).toLocaleDateString('en-IN')
-                            : '-'}
+                          {formatDate(loan.date_of_release)}
                         </TableCell>
                         <TableCell>
                           <span
@@ -406,7 +380,7 @@ export default function GranularPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {loan.released !== 'TRUE'
-                            ? `₹${(loan.pending_loan_amount || 0).toLocaleString('en-IN')}`
+                            ? formatCurrency(loan.pending_loan_amount)
                             : '-'}
                         </TableCell>
                       </TableRow>
