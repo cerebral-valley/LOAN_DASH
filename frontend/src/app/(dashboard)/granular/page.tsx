@@ -303,7 +303,7 @@ export default function GranularPage() {
             <Search className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(metrics.totalOutstanding)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(Math.round(metrics.totalOutstanding))}</div>
             <p className="text-xs text-muted-foreground">Pending amount</p>
           </CardContent>
         </Card>
