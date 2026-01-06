@@ -214,10 +214,11 @@ export class LoanController {
     try {
       const customers = await this.loanRepository
         .createQueryBuilder('loan')
-        .select('DISTINCT loan.customer_id', 'customer_id')
+        .select('loan.customer_id', 'customer_id')
         .addSelect('loan.customer_name', 'customer_name')
         .addSelect('loan.customer_type', 'customer_type')
         .where("UPPER(loan.customer_type) = 'VYAPARI'")
+        .distinct(true)
         .orderBy('loan.customer_name', 'ASC')
         .getRawMany();
 
