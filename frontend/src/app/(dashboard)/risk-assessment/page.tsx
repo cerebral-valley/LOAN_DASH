@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useLoans } from '@/lib/queries';
+import { Loan } from '@/lib/api';
+import { useActiveLoans } from '@/lib/queries';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
@@ -30,27 +31,7 @@ interface RiskMetrics {
 }
 
 export default function RiskAssessmentPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLoans();
-  }, []);
-
-  const fetchLoans = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await loanApi.getActive();
-      setLoans(response.data);
-    } catch (err) {
-      setError('Failed to fetch risk assessment data. Please ensure the backend server is running.');
-      console.error('Error fetching loans:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: loans = [], isLoading, error, refetch } = useActiveLoans();
 
   // Calculate risk metrics for active loans
   const calculateRisk = (loan: Loan): RiskMetrics => {
@@ -168,28 +149,12 @@ export default function RiskAssessmentPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading risk assessment...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchLoans}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch risk assessment data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
