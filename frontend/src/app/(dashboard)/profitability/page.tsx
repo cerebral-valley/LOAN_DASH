@@ -1,136 +1,129 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { loanApi, Loan, expenseApi, Expense, downloadCSV } from '@/lib/api';
+import { useLoans, useExpenses } from '@/lib/queries';
+import { useDownloadLoanCSV } from '@/lib/hooks';
 import { Download, TrendingUp, DollarSign, PieChart, Target } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 export default function ProfitabilityPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans();
+  const { data: expenses = [], isLoading: expensesLoading, error: expensesError, refetch: refetchExpenses } = useExpenses();
+  const { download: downloadCSV } = useDownloadLoanCSV();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [loansRes, expensesRes] = await Promise.all([
-        loanApi.getAll(),
-        expenseApi.getAll(),
-      ]);
-      setLoans(loansRes.data);
-      setExpenses(expensesRes.data);
-    } catch (err) {
-      setError('Failed to fetch profitability data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isLoading = loansLoading || expensesLoading;
+  const error = loansError || expensesError;
 
   // Calculate profitability metrics
-  const totalInterestReceived = loans.reduce(
-    (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
-    0
-  );
-
-  const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-
-  const grossProfit = totalInterestReceived;
-  const netProfit = totalInterestReceived - totalExpenses;
-  const profitMargin = totalInterestReceived > 0 
-    ? ((netProfit / totalInterestReceived) * 100) 
-    : 0;
-
-  const totalDisbursed = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-  const roi = totalDisbursed > 0 
-    ? ((totalInterestReceived / totalDisbursed) * 100) 
-    : 0;
-
-  // Monthly breakdown
-  const currentYear = new Date().getFullYear();
-  const monthlyData = [];
-  
-  for (let month = 0; month < 12; month++) {
-    const monthLoans = loans.filter((loan) => {
-      const date = loan.last_date_of_interest_deposit
-        ? new Date(loan.last_date_of_interest_deposit)
-        : null;
-      return date && date.getFullYear() === currentYear && date.getMonth() === month;
-    });
-
-    const monthExpenses = expenses.filter((expense) => {
-      const date = expense.date ? new Date(expense.date) : null;
-      return date && date.getFullYear() === currentYear && date.getMonth() === month;
-    });
-
-    const monthInterest = monthLoans.reduce(
+  const metrics = useMemo(() => {
+    const metrics.totalInterestReceived = loans.reduce(
       (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
       0
     );
 
-    const monthExpense = monthExpenses.reduce(
-      (sum, expense) => sum + (expense.amount || 0),
-      0
-    );
+    const metrics.totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
-    monthlyData.push({
-      month: new Date(currentYear, month).toLocaleDateString('en-US', { month: 'short' }),
-      interest: monthInterest,
-      expenses: monthExpense,
-      profit: monthInterest - monthExpense,
-    });
-  }
+    const metrics.grossProfit = metrics.totalInterestReceived;
+    const metrics.netProfit = metrics.totalInterestReceived - metrics.totalExpenses;
+    const metrics.profitMargin = metrics.totalInterestReceived > 0 
+      ? ((metrics.netProfit / metrics.totalInterestReceived) * 100) 
+      : 0;
 
-  const handleDownloadCSV = async () => {
+    const metrics.totalDisbursed = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+    const metrics.roi = metrics.totalDisbursed > 0 
+      ? ((metrics.totalInterestReceived / metrics.totalDisbursed) * 100) 
+      : 0;
+
+    // Monthly breakdown
+    const currentYear = new Date().getFullYear();
+    const monthlyData = [];
+    
+    for (let month = 0; month < 12; month++) {
+      const monthLoans = loans.filter((loan) => {
+        const date = loan.last_date_of_interest_deposit
+          ? new Date(loan.last_date_of_interest_deposit)
+          : null;
+        return date && date.getFullYear() === currentYear && date.getMonth() === month;
+      });
+
+      const monthExpenses = expenses.filter((expense) => {
+        const date = expense.date ? new Date(expense.date) : null;
+        return date && date.getFullYear() === currentYear && date.getMonth() === month;
+      });
+
+      const monthInterest = monthLoans.reduce(
+        (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
+        0
+      );
+
+      const monthExpense = monthExpenses.reduce(
+        (sum, expense) => sum + (expense.amount || 0),
+        0
+      );
+
+      monthlyData.push({
+        month: new Date(currentYear, month).toLocaleDateString('en-US', { month: 'short' }),
+        interest: monthInterest,
+        expenses: monthExpense,
+        profit: monthInterest - monthExpense,
+      });
+    }
+
+    return {
+      metrics.totalInterestReceived,
+      metrics.totalExpenses,
+      metrics.grossProfit,
+      metrics.netProfit,
+      metrics.profitMargin,
+      metrics.roi,
+      metrics.totalDisbursed,
+      monthlyData,
+    };
+  }, [loans, expenses]);
+
+  const handleDownloadCSV = () => {
     try {
       const csvData = {
-        'Total Interest Received': totalInterestReceived,
-        'Total Expenses': totalExpenses,
-        'Gross Profit': grossProfit,
-        'Net Profit': netProfit,
-        'Profit Margin': `${profitMargin.toFixed(2)}%`,
-        'ROI': `${roi.toFixed(2)}%`,
+        'Total Interest Received': metrics.metrics.totalInterestReceived,
+        'Total Expenses': metrics.metrics.totalExpenses,
+        'Gross Profit': metrics.metrics.grossProfit,
+        'Net Profit': metrics.metrics.netProfit,
+        'Profit Margin': `${metrics.metrics.metrics.profitMargin.toFixed(2)}%`,
+        'ROI': `${metrics.metrics.metrics.roi.toFixed(2)}%`,
       };
 
       const csvString =
         Object.keys(csvData).join(',') + '\n' + Object.values(csvData).join(',');
 
       const blob = new Blob([csvString], { type: 'text/csv' });
-      downloadCSV(blob, 'profitability-analysis.csv');
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'profitability-analysis.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading profitability data...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState 
+      message="Failed to fetch profitability data. Please ensure the backend server is running." 
+      onRetry={() => {
+        refetchLoans();
+        refetchExpenses();
+      }} 
+    />;
   }
 
   return (
@@ -156,7 +149,7 @@ export default function ProfitabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{grossProfit.toLocaleString('en-IN')}
+              ₹{metrics.metrics.grossProfit.toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">Total interest received</p>
           </CardContent>
@@ -169,7 +162,7 @@ export default function ProfitabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{totalExpenses.toLocaleString('en-IN')}
+              ₹{metrics.metrics.totalExpenses.toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">Operating costs</p>
           </CardContent>
@@ -182,7 +175,7 @@ export default function ProfitabilityPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹{netProfit.toLocaleString('en-IN')}
+              ₹{metrics.metrics.netProfit.toLocaleString('en-IN')}
             </div>
             <p className="text-xs text-muted-foreground">After expenses</p>
           </CardContent>
@@ -194,7 +187,7 @@ export default function ProfitabilityPage() {
             <PieChart className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{roi.toFixed(2)}%</div>
+            <div className="text-2xl font-bold">{metrics.metrics.roi.toFixed(2)}%</div>
             <p className="text-xs text-muted-foreground">Return on investment</p>
           </CardContent>
         </Card>
@@ -211,14 +204,14 @@ export default function ProfitabilityPage() {
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Profit Margin</span>
                 <span className="text-sm font-bold text-green-500">
-                  {profitMargin.toFixed(2)}%
+                  {metrics.metrics.profitMargin.toFixed(2)}%
                 </span>
               </div>
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Expense Ratio</span>
                 <span className="text-sm text-muted-foreground">
-                  {totalInterestReceived > 0
-                    ? ((totalExpenses / totalInterestReceived) * 100).toFixed(2)
+                  {metrics.totalInterestReceived > 0
+                    ? ((metrics.totalExpenses / metrics.totalInterestReceived) * 100).toFixed(2)
                     : 0}
                   %
                 </span>
@@ -226,7 +219,7 @@ export default function ProfitabilityPage() {
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="text-sm font-medium">Average Interest per Loan</span>
                 <span className="text-sm text-muted-foreground">
-                  ₹{(totalInterestReceived / loans.length).toLocaleString('en-IN', {
+                  ₹{(metrics.totalInterestReceived / loans.length).toLocaleString('en-IN', {
                     maximumFractionDigits: 0,
                   })}
                 </span>
@@ -234,7 +227,7 @@ export default function ProfitabilityPage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Interest to Principal Ratio</span>
                 <span className="text-sm text-muted-foreground">
-                  {((totalInterestReceived / totalDisbursed) * 100).toFixed(2)}%
+                  {((metrics.totalInterestReceived / metrics.totalDisbursed) * 100).toFixed(2)}%
                 </span>
               </div>
             </div>
