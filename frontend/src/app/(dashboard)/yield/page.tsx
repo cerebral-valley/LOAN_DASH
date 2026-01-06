@@ -4,7 +4,8 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan } from '@/lib/api';
+import { Loan } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
 import { Download, TrendingUp, Calendar, PieChart } from 'lucide-react';
 import { calculateDaysToRelease } from '@/lib/loan-utils';
 import { 
@@ -46,75 +47,46 @@ interface LoanAmountBucket {
 }
 
 export default function YieldPage() {
-  const [metrics, setMetrics] = useState<YieldMetrics | null>(null);
-  const [holdingPeriodSegments, setHoldingPeriodSegments] = useState<HoldingPeriodSegment[]>([]);
-  const [loanAmountBuckets, setLoanAmountBuckets] = useState<LoanAmountBucket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: allLoans = [], isLoading, error, refetch } = useLoans();
 
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { metrics, holdingPeriodSegments, loanAmountBuckets, releasedLoans } = useMemo(() => {
+    // Filter released loans only
+    const released = allLoans.filter(
+      (loan) =>
+        loan.released === 'TRUE' &&
+        loan.date_of_disbursement &&
+        loan.date_of_release &&
+        loan.loan_amount &&
+        loan.loan_amount > 0
+    );
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getAll();
-      const loansData = response.data;
+    const calculateDaysToReleaseFn = (loan: Loan): number => {
+      if (loan.date_of_disbursement && loan.date_of_release) {
+        return calculateDaysToRelease(
+          new Date(loan.date_of_disbursement),
+          new Date(loan.date_of_release)
+        );
+      }
+      return 0;
+    };
 
-      // Filter released loans only
-      const releasedLoans = loansData.filter(
-        (loan) =>
-          loan.released === 'TRUE' &&
-          loan.date_of_disbursement &&
-          loan.date_of_release &&
-          loan.loan_amount &&
-          loan.loan_amount > 0
-      );
-
-      // Calculate metrics
-      calculateMetrics(releasedLoans);
-      calculateHoldingPeriodSegments(releasedLoans);
-      calculateLoanAmountBuckets(releasedLoans);
-
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateDaysToReleaseFn = (loan: Loan): number => {
-    if (loan.date_of_disbursement && loan.date_of_release) {
-      return calculateDaysToRelease(
-        new Date(loan.date_of_disbursement),
-        new Date(loan.date_of_release)
-      );
-    }
-    return 0;
-  };
-
-  const calculateMetrics = (releasedLoans: Loan[]) => {
-    const totalCapital = sumLoanAmounts(releasedLoans);
-    const totalInterest = sumInterest(releasedLoans);
-    const weightedAvgDays = calculateWeightedAvgDays(releasedLoans, calculateDaysToReleaseFn);
+    // Calculate metrics
+    const totalCapital = sumLoanAmounts(released);
+    const totalInterest = sumInterest(released);
+    const weightedAvgDays = calculateWeightedAvgDays(released, calculateDaysToReleaseFn);
     const portfolioYield = calculatePortfolioYield(totalInterest, totalCapital, weightedAvgDays);
     const simpleReturn = calculateSimpleReturn(totalInterest, totalCapital);
 
-    setMetrics({
+    const metricsData: YieldMetrics = {
       portfolioYield,
       simpleReturn,
       totalInterest,
       totalCapital,
       weightedAvgDays: Math.round(weightedAvgDays),
-    });
-  };
+    };
 
-  const calculateHoldingPeriodSegments = (releasedLoans: Loan[]) => {
-    const shortTerm = releasedLoans.filter((loan) => {
+    // Calculate holding period segments
+    const shortTerm = released.filter((loan) => {
       if (loan.date_of_disbursement && loan.date_of_release) {
         const days = calculateDaysToRelease(
           new Date(loan.date_of_disbursement),
@@ -125,7 +97,7 @@ export default function YieldPage() {
       return false;
     });
 
-    const longTerm = releasedLoans.filter((loan) => {
+    const longTerm = released.filter((loan) => {
       if (loan.date_of_disbursement && loan.date_of_release) {
         const days = calculateDaysToRelease(
           new Date(loan.date_of_disbursement),
@@ -137,19 +109,17 @@ export default function YieldPage() {
     });
 
     const calculateSegmentYield = (loans: Loan[]) => {
-      const totalCapital = sumLoanAmounts(loans);
-      const totalInterest = sumInterest(loans);
+      const segCapital = sumLoanAmounts(loans);
+      const segInterest = sumInterest(loans);
       const avgDays = calculateWeightedAvgDays(loans, calculateDaysToReleaseFn);
-      const portfolioYield = calculatePortfolioYield(totalInterest, totalCapital, avgDays);
-      return { portfolioYield, capital: totalCapital, avgDays: Math.round(avgDays) };
+      const segYield = calculatePortfolioYield(segInterest, segCapital, avgDays);
+      return { portfolioYield: segYield, capital: segCapital, avgDays: Math.round(avgDays) };
     };
 
     const shortTermData = calculateSegmentYield(shortTerm);
     const longTermData = calculateSegmentYield(longTerm);
 
-    const totalCapital = sumLoanAmounts(releasedLoans);
-
-    setHoldingPeriodSegments([
+    const holdingSegments: HoldingPeriodSegment[] = [
       {
         segment: 'Short-term (<30 days)',
         portfolioYield: shortTermData.portfolioYield,
@@ -166,10 +136,9 @@ export default function YieldPage() {
         avgDays: longTermData.avgDays,
         loanCount: longTerm.length,
       },
-    ]);
-  };
+    ];
 
-  const calculateLoanAmountBuckets = (releasedLoans: Loan[]) => {
+    // Calculate loan amount buckets
     const buckets = [
       { min: 0, max: 50000, label: '<₹50K' },
       { min: 50000, max: 100000, label: '₹50K-100K' },
@@ -178,21 +147,19 @@ export default function YieldPage() {
       { min: 200000, max: Infinity, label: '₹200K+' },
     ];
 
-    const totalCapital = sumLoanAmounts(releasedLoans);
-
     const bucketData = buckets.map((bucket) => {
-      const bucketLoans = releasedLoans.filter(
+      const bucketLoans = released.filter(
         (loan) => loan.loan_amount && loan.loan_amount >= bucket.min && loan.loan_amount < bucket.max
       );
 
       const capital = sumLoanAmounts(bucketLoans);
       const interest = sumInterest(bucketLoans);
       const avgDays = calculateWeightedAvgDays(bucketLoans, calculateDaysToReleaseFn);
-      const portfolioYield = calculatePortfolioYield(interest, capital, avgDays);
+      const bucketYield = calculatePortfolioYield(interest, capital, avgDays);
 
       return {
         range: bucket.label,
-        portfolioYield,
+        portfolioYield: bucketYield,
         capital,
         portfolioPercentage: totalCapital > 0 ? (capital / totalCapital) * 100 : 0,
         loanCount: bucketLoans.length,
@@ -200,10 +167,15 @@ export default function YieldPage() {
       };
     });
 
-    setLoanAmountBuckets(bucketData);
-  };
+    return {
+      metrics: metricsData,
+      holdingPeriodSegments: holdingSegments,
+      loanAmountBuckets: bucketData,
+      releasedLoans: released,
+    };
+  }, [allLoans]);
 
-  const handleDownloadCSV = async () => {
+  const handleDownloadCSV = () => {
     try {
       // Export the calculated yield analysis data
       const csvData = [
@@ -238,12 +210,12 @@ export default function YieldPage() {
     }
   };
 
-  if (loading) {
-    return <LoadingState message="Loading interest yield analysis..." />;
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchData} />;
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
