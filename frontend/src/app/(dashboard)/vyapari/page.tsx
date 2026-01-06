@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, VyapariCustomer, downloadCSV } from '@/lib/api';
+import { useLoans } from '@/lib/queries';
+import { useDownloadLoanCSV } from '@/lib/hooks';
+import { VyapariCustomer } from '@/lib/api';
 import { Download, Briefcase, TrendingUp } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 interface VyapariYearlyData {
   [customerName: string]: {
@@ -17,89 +21,61 @@ interface VyapariYearlyData {
 }
 
 export default function VyapariPage() {
-  const [vyapariCustomers, setVyapariCustomers] = useState<VyapariCustomer[]>([]);
-  const [vyapariLoans, setVyapariLoans] = useState<Loan[]>([]);
-  const [yearlyData, setYearlyData] = useState<VyapariYearlyData>({});
-  const [years, setYears] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { download: downloadCSV } = useDownloadLoanCSV();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Filter vyapari loans and calculate data
+  const { vyapariLoans, vyapariCustomers, yearlyData, years } = useMemo(() => {
+    // Filter vyapari loans
+    const vyapariLoansData = loans.filter(
+      (loan) => loan.customer_type?.toUpperCase().trim() === 'VYAPARI'
+    );
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch all loans
-      const loansResponse = await loanApi.getAll();
-      const allLoans = loansResponse.data;
-      
-      // Filter vyapari loans
-      const vyapariLoansData = allLoans.filter(
-        (loan) => loan.customer_type?.toUpperCase().trim() === 'VYAPARI'
-      );
-      setVyapariLoans(vyapariLoansData);
+    // Get unique vyapari customers
+    const customersMap = new Map<string, VyapariCustomer>();
+    vyapariLoansData.forEach((loan) => {
+      if (loan.customer_name && loan.customer_id) {
+        customersMap.set(loan.customer_name, {
+          customer_id: loan.customer_id,
+          customer_name: loan.customer_name,
+          customer_type: loan.customer_type || 'Vyapari',
+        });
+      }
+    });
+    const customers = Array.from(customersMap.values()).sort((a, b) =>
+      a.customer_name.localeCompare(b.customer_name)
+    );
 
-      // Get unique vyapari customers
-      const customersMap = new Map<string, VyapariCustomer>();
-      vyapariLoansData.forEach((loan) => {
-        if (loan.customer_name && loan.customer_id) {
-          customersMap.set(loan.customer_name, {
-            customer_id: loan.customer_id,
-            customer_name: loan.customer_name,
-            customer_type: loan.customer_type || 'Vyapari',
-          });
+    // Calculate yearly data per customer
+    const yearly: VyapariYearlyData = {};
+    const yearSet = new Set<string>();
+
+    vyapariLoansData.forEach((loan) => {
+      if (loan.customer_name && loan.date_of_disbursement) {
+        const customerName = loan.customer_name;
+        const year = new Date(loan.date_of_disbursement).getFullYear().toString();
+        
+        yearSet.add(year);
+
+        if (!yearly[customerName]) {
+          yearly[customerName] = {};
         }
-      });
-      const customers = Array.from(customersMap.values()).sort((a, b) =>
-        a.customer_name.localeCompare(b.customer_name)
-      );
-      setVyapariCustomers(customers);
+        if (!yearly[customerName][year]) {
+          yearly[customerName][year] = { amount: 0, count: 0 };
+        }
 
-      // Calculate yearly data per customer
-      const yearly: VyapariYearlyData = {};
-      const yearSet = new Set<string>();
-
-      vyapariLoansData.forEach((loan) => {
-        if (loan.customer_name && loan.date_of_disbursement) {
-          const customerName = loan.customer_name;
-          const year = new Date(loan.date_of_disbursement).getFullYear().toString();
-          
-          yearSet.add(year);
-
-          if (!yearly[customerName]) {
-            yearly[customerName] = {};
-          }
-          if (!yearly[customerName][year]) {
-            yearly[customerName][year] = { amount: 0, count: 0 };
-          }
-
-          yearly[customerName][year].amount += loan.loan_amount || 0;
-          yearly[customerName][year].count += 1;
+        yearly[customerName][year].amount += loan.loan_amount || 0;
+        yearly[customerName][year].count += 1;
         }
       });
 
-      setYearlyData(yearly);
-      setYears(Array.from(yearSet).sort());
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch loan data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadCSV = async () => {
-    try {
-      const response = await loanApi.downloadCSV();
-      downloadCSV(response.data, 'vyapari-wise-analysis.csv');
-    } catch (err) {
-      console.error('Error downloading CSV:', err);
-    }
-  };
+    return {
+      vyapariLoans: vyapariLoansData,
+      vyapariCustomers: customers,
+      yearlyData: yearly,
+      years: Array.from(yearSet).sort(),
+    };
+  }, [loans]);
 
   const calculateCustomerTotal = (customerName: string, type: 'amount' | 'count') => {
     if (!yearlyData[customerName]) return 0;
@@ -112,28 +88,12 @@ export default function VyapariPage() {
     }, 0);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading vyapari-wise analysis...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch loan data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -145,7 +105,7 @@ export default function VyapariPage() {
             Individual analysis of loans by Vyapari customer
           </p>
         </div>
-        <Button onClick={handleDownloadCSV} variant="outline">
+        <Button onClick={() => downloadCSV('vyapari-wise-analysis.csv')} variant="outline">
           <Download className="mr-2 h-4 w-4" />
           Export CSV
         </Button>

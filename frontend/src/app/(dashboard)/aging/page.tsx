@@ -12,7 +12,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useActiveLoans } from '@/lib/queries';
-import { Loan } from '@/lib/api';
 import { Download, Clock, AlertCircle } from 'lucide-react';
 import { calculateLoanAge, calculateAgeBucket } from '@/lib/loan-utils';
 import { formatCurrency, formatDate } from '@/lib/formatting-utils';

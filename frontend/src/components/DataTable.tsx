@@ -14,17 +14,17 @@ import { Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { exportToCSV } from '@/lib/csv-utils';
 import { formatCurrency, formatDate, formatPercentage } from '@/lib/formatting-utils';
 
-export interface ColumnDefinition<T = any> {
+export interface ColumnDefinition<T = Record<string, unknown>> {
   key: string;
   label: string;
   format?: 'text' | 'currency' | 'date' | 'percentage' | 'number';
-  formatter?: (value: any, row: T) => string | number | React.ReactNode;
+  formatter?: (value: unknown, row: T) => string | number | React.ReactNode;
   sortable?: boolean;
   width?: string;
   align?: 'left' | 'center' | 'right';
 }
 
-interface DataTableProps<T = any> {
+interface DataTableProps<T = Record<string, unknown>> {
   data: T[];
   columns: ColumnDefinition<T>[];
   exportFilename?: string;
@@ -104,7 +104,7 @@ export function DataTable<T extends Record<string, any>>({
 
     // Prepare data for CSV export
     const csvData = sortedData.map((row) => {
-      const csvRow: Record<string, any> = {};
+      const csvRow: Record<string, unknown> = {};
       columns.forEach((col) => {
         const value = row[col.key];
         
@@ -126,7 +126,7 @@ export function DataTable<T extends Record<string, any>>({
     exportToCSV(csvData, exportFilename);
   };
 
-  const formatCellValue = (value: any, column: ColumnDefinition<T>, row: T) => {
+  const formatCellValue = (value: unknown, column: ColumnDefinition<T>, row: T) => {
     // Use custom formatter if provided
     if (column.formatter) {
       return column.formatter(value, row);

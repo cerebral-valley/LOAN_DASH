@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useExpenses } from '@/lib/queries';
 import { useDownloadExpenseCSV } from '@/lib/hooks';
-import { Expense } from '@/lib/api';
 import { Download, Receipt, Search, Filter, DollarSign } from 'lucide-react';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
