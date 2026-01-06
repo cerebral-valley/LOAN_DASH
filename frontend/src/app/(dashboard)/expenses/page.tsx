@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { expenseApi, Expense, downloadCSV } from '@/lib/api';
+import { useExpenses } from '@/lib/queries';
+import { useDownloadExpenseCSV } from '@/lib/hooks';
+import { Expense } from '@/lib/api';
 import { Download, Receipt, Search, Filter, DollarSign } from 'lucide-react';
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -13,10 +17,8 @@ const MONTHS = [
 ];
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: expenses = [], isLoading, error, refetch } = useExpenses();
+  const { download: downloadCSV } = useDownloadExpenseCSV();
 
   // Filter states
   const [searchId, setSearchId] = useState<string>('');
@@ -27,66 +29,32 @@ export default function ExpensesPage() {
   const [selectedYear, setSelectedYear] = useState<string>('--All--');
   const [selectedMonth, setSelectedMonth] = useState<string>('--All--');
 
-  // Filter options
-  const [ledgers, setLedgers] = useState<string[]>([]);
-  const [users, setUsers] = useState<string[]>([]);
-  const [paymentModes, setPaymentModes] = useState<string[]>([]);
-  const [years, setYears] = useState<string[]>([]);
+  // Extract unique filter options
+  const { ledgers, users, paymentModes, years } = useMemo(() => {
+    const ledgerSet = new Set<string>();
+    const userSet = new Set<string>();
+    const paymentModeSet = new Set<string>();
+    const yearSet = new Set<string>();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+    expenses.forEach((expense) => {
+      if (expense.ledger) ledgerSet.add(expense.ledger);
+      if (expense.user) userSet.add(expense.user);
+      if (expense.payment_mode) paymentModeSet.add(expense.payment_mode);
+      if (expense.date) {
+        yearSet.add(new Date(expense.date).getFullYear().toString());
+      }
+    });
 
-  useEffect(() => {
-    applyFilters();
-  }, [
-    expenses,
-    searchId,
-    searchInvoice,
-    selectedLedger,
-    selectedUser,
-    selectedPaymentMode,
-    selectedYear,
-    selectedMonth,
-  ]);
+    return {
+      ledgers: Array.from(ledgerSet).sort(),
+      users: Array.from(userSet).sort(),
+      paymentModes: Array.from(paymentModeSet).sort(),
+      years: Array.from(yearSet).sort(),
+    };
+  }, [expenses]);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const response = await expenseApi.getAll();
-      const expensesData = response.data;
-      setExpenses(expensesData);
-
-      // Extract unique filter options
-      const ledgerSet = new Set<string>();
-      const userSet = new Set<string>();
-      const paymentModeSet = new Set<string>();
-      const yearSet = new Set<string>();
-
-      expensesData.forEach((expense) => {
-        if (expense.ledger) ledgerSet.add(expense.ledger);
-        if (expense.user) userSet.add(expense.user);
-        if (expense.payment_mode) paymentModeSet.add(expense.payment_mode);
-        if (expense.date) {
-          yearSet.add(new Date(expense.date).getFullYear().toString());
-        }
-      });
-
-      setLedgers(Array.from(ledgerSet).sort());
-      setUsers(Array.from(userSet).sort());
-      setPaymentModes(Array.from(paymentModeSet).sort());
-      setYears(Array.from(yearSet).sort());
-
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch expense data. Please ensure the backend server is running.');
-      console.error('Error fetching data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
+  // Apply filters
+  const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
 
     // Search by ID
@@ -133,50 +101,44 @@ export default function ExpensesPage() {
       });
     }
 
-    setFilteredExpenses(filtered);
-  };
+    return filtered;
+  }, [
+    expenses,
+    searchId,
+    searchInvoice,
+    selectedLedger,
+    selectedUser,
+    selectedPaymentMode,
+    selectedYear,
+    selectedMonth,
+  ]);
 
-  const handleDownloadCSV = async () => {
-    try {
-      const response = await expenseApi.downloadCSV();
-      downloadCSV(response.data, 'expenses.csv');
-    } catch (err) {
-      console.error('Error downloading CSV:', err);
-    }
-  };
+  // Calculate stats
+  const { totalAmount, totalCount, averageAmount, cashExpenses, bankExpenses } = useMemo(() => {
+    const total = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    const count = filteredExpenses.length;
+    const cash = filteredExpenses.filter(
+      (e) => e.payment_mode?.toLowerCase() === 'cash'
+    ).length;
+    const bank = filteredExpenses.filter(
+      (e) => e.payment_mode?.toLowerCase() !== 'cash' && e.payment_mode
+    ).length;
 
-  const totalAmount = filteredExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-  const totalCount = filteredExpenses.length;
-  const averageAmount = totalCount > 0 ? totalAmount / totalCount : 0;
-  const cashExpenses = filteredExpenses.filter(
-    (e) => e.payment_mode?.toLowerCase() === 'cash'
-  ).length;
-  const bankExpenses = filteredExpenses.filter(
-    (e) => e.payment_mode?.toLowerCase() !== 'cash' && e.payment_mode
-  ).length;
+    return {
+      totalAmount: total,
+      totalCount: count,
+      averageAmount: count > 0 ? total / count : 0,
+      cashExpenses: cash,
+      bankExpenses: bank,
+    };
+  }, [filteredExpenses]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading expense tracker...</div>
-      </div>
-    );
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return (
-      <div className="p-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={fetchData}>Retry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorState message="Failed to fetch expense data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
@@ -188,7 +150,7 @@ export default function ExpensesPage() {
             Comprehensive expense tracking and analysis with advanced filtering
           </p>
         </div>
-        <Button onClick={handleDownloadCSV} variant="outline">
+        <Button onClick={() => downloadCSV('expenses.csv')} variant="outline">
           <Download className="mr-2 h-4 w-4" />
           Export CSV
         </Button>

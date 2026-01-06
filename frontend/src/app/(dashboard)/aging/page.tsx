@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { loanApi, Loan } from '@/lib/api';
+import { useActiveLoans } from '@/lib/queries';
+import { Loan } from '@/lib/api';
 import { Download, Clock, AlertCircle } from 'lucide-react';
 import { calculateLoanAge, calculateAgeBucket } from '@/lib/loan-utils';
 import { formatCurrency, formatDate } from '@/lib/formatting-utils';
@@ -30,49 +31,32 @@ interface AgingMetrics {
 }
 
 export default function AgingPage() {
-  const [loans, setLoans] = useState<Loan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchLoans();
-  }, []);
-
-  const fetchLoans = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await loanApi.getActive();
-      setLoans(response.data);
-    } catch (err) {
-      setError('Failed to fetch aging data. Please ensure the backend server is running.');
-      console.error('Error fetching loans:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: loans = [], isLoading, error, refetch } = useActiveLoans();
 
   // Calculate aging metrics
-  const calculateAging = (loan: Loan): AgingMetrics => {
-    const disbursementDate = loan.date_of_disbursement
-      ? new Date(loan.date_of_disbursement)
-      : new Date();
-    const ageInDays = calculateLoanAge(loan.date_of_disbursement);
-    const ageBucket = calculateAgeBucket(ageInDays);
+  const agingMetrics = useMemo(() => {
+    return loans.map((loan): AgingMetrics => {
+      const disbursementDate = loan.date_of_disbursement
+        ? new Date(loan.date_of_disbursement)
+        : new Date();
+      const ageInDays = calculateLoanAge(loan.date_of_disbursement);
+      const ageBucket = calculateAgeBucket(ageInDays);
 
-    return {
-      loanNumber: loan.loan_number,
-      customerName: loan.customer_name || 'Unknown',
-      loanAmount: loan.loan_amount || 0,
-      outstanding: loan.pending_loan_amount || 0,
-      disbursementDate,
-      ageInDays,
-      ageBucket,
-    };
-  };
+      return {
+        loanNumber: loan.loan_number,
+        customerName: loan.customer_name || 'Unknown',
+        loanAmount: loan.loan_amount || 0,
+        outstanding: loan.pending_loan_amount || 0,
+        disbursementDate,
+        ageInDays,
+        ageBucket,
+      };
+    });
+  }, [loans]);
 
-  const agingMetrics = loans.map(calculateAging);
-  const sortedByAge = agingMetrics.sort((a, b) => b.ageInDays - a.ageInDays);
+  const sortedByAge = useMemo(() => {
+    return [...agingMetrics].sort((a, b) => b.ageInDays - a.ageInDays);
+  }, [agingMetrics]);
 
   // Aging buckets summary
   const agingBuckets = [
@@ -111,12 +95,12 @@ export default function AgingPage() {
     }
   };
 
-  if (loading) {
-    return <LoadingState message="Loading aging analysis..." />;
+  if (isLoading) {
+    return <LoadingState />;
   }
 
   if (error) {
-    return <ErrorState message={error} onRetry={fetchLoans} />;
+    return <ErrorState message="Failed to fetch aging data. Please ensure the backend server is running." onRetry={() => refetch()} />;
   }
 
   return (
