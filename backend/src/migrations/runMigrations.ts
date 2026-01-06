@@ -13,18 +13,29 @@ export async function runMigrations() {
   try {
     console.log('📦 Running database migrations...');
     
-    const migrationPath = join(__dirname, '001_add_performance_indexes.sql');
-    const migrationSQL = readFileSync(migrationPath, 'utf-8');
+    // List of migration files to run in order
+    const migrations = [
+      '001_add_performance_indexes.sql',
+      '002_add_covering_indexes.sql'
+    ];
     
-    // Split by semicolon and filter empty statements
-    const statements = migrationSQL
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'));
-    
-    // Execute each statement
-    for (const statement of statements) {
-      await AppDataSource.query(statement);
+    for (const migrationFile of migrations) {
+      console.log(`  Running migration: ${migrationFile}`);
+      const migrationPath = join(__dirname, migrationFile);
+      const migrationSQL = readFileSync(migrationPath, 'utf-8');
+      
+      // Split by semicolon and filter empty statements
+      const statements = migrationSQL
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('--'));
+      
+      // Execute each statement
+      for (const statement of statements) {
+        await AppDataSource.query(statement);
+      }
+      
+      console.log(`  ✅ Completed: ${migrationFile}`);
     }
     
     console.log('✅ Database migrations completed successfully');
