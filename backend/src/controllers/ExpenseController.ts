@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { ExpenseTracker } from '../entities/ExpenseTracker';
 import { stringify } from 'csv-stringify/sync';
-import { cache } from '../utils/cache';
+import { cache } from '../utils/redisCache';
 
 export class ExpenseController {
   private expenseRepository = AppDataSource.getRepository(ExpenseTracker);
@@ -55,18 +55,53 @@ export class ExpenseController {
 
   downloadExpensesCSV = async (req: Request, res: Response) => {
     try {
-      const expenses = await this.expenseRepository.find({
-        order: { date: 'DESC' },
-      });
-
-      const csvData = stringify(expenses, {
-        header: true,
-        columns: Object.keys(expenses[0] || {}),
-      });
+      // Use streaming to avoid loading all data into memory
+      const stream = await this.expenseRepository
+        .createQueryBuilder('expense')
+        .orderBy('expense.date', 'DESC')
+        .stream();
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=expenses.csv');
-      res.send(csvData);
+      res.setHeader('Transfer-Encoding', 'chunked');
+
+      let headerWritten = false;
+
+      stream.on('data', (expense) => {
+        try {
+          // Write CSV header on first row
+          if (!headerWritten) {
+            const headers = Object.keys(expense).join(',');
+            res.write(headers + '\n');
+            headerWritten = true;
+          }
+
+          // Write data row
+          const values = Object.values(expense).map((value) => {
+            // Escape values that contain commas, quotes, or newlines
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          });
+          res.write(values.join(',') + '\n');
+        } catch (error) {
+          console.error('Error writing CSV row:', error);
+        }
+      });
+
+      stream.on('end', () => {
+        res.end();
+      });
+
+      stream.on('error', (error) => {
+        console.error('Stream error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to download CSV' });
+        }
+      });
     } catch (error) {
       console.error('Error downloading expenses CSV:', error);
       res.status(500).json({ error: 'Failed to download CSV' });
@@ -77,7 +112,7 @@ export class ExpenseController {
     try {
       // Check cache first
       const cacheKey = 'expense_stats';
-      const cachedStats = cache.get(cacheKey);
+      const cachedStats = await cache.get(cacheKey);
       if (cachedStats) {
         return res.json(cachedStats);
       }
@@ -99,7 +134,7 @@ export class ExpenseController {
       };
 
       // Store in cache
-      cache.set(cacheKey, result);
+      await cache.set(cacheKey, result);
 
       res.json(result);
     } catch (error) {

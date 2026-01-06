@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { AppDataSource } from '../config/database';
 import { Loan } from '../entities/Loan';
 import { stringify } from 'csv-stringify/sync';
-import { cache } from '../utils/cache';
+import { cache } from '../utils/redisCache';
 
 export class LoanController {
   private loanRepository = AppDataSource.getRepository(Loan);
@@ -153,16 +153,51 @@ export class LoanController {
 
   downloadLoansCSV = async (req: Request, res: Response) => {
     try {
-      const loans = await this.loanRepository.find();
-
-      const csvData = stringify(loans, {
-        header: true,
-        columns: Object.keys(loans[0] || {}),
-      });
+      // Use streaming to avoid loading all data into memory
+      const stream = await this.loanRepository.createQueryBuilder('loan').stream();
 
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=loans.csv');
-      res.send(csvData);
+      res.setHeader('Transfer-Encoding', 'chunked');
+
+      let isFirstRow = true;
+      let headerWritten = false;
+
+      stream.on('data', (loan) => {
+        try {
+          // Write CSV header on first row
+          if (!headerWritten) {
+            const headers = Object.keys(loan).join(',');
+            res.write(headers + '\n');
+            headerWritten = true;
+          }
+
+          // Write data row
+          const values = Object.values(loan).map((value) => {
+            // Escape values that contain commas, quotes, or newlines
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          });
+          res.write(values.join(',') + '\n');
+        } catch (error) {
+          console.error('Error writing CSV row:', error);
+        }
+      });
+
+      stream.on('end', () => {
+        res.end();
+      });
+
+      stream.on('error', (error) => {
+        console.error('Stream error:', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to download CSV' });
+        }
+      });
     } catch (error) {
       console.error('Error downloading loans CSV:', error);
       res.status(500).json({ error: 'Failed to download CSV' });
@@ -173,7 +208,7 @@ export class LoanController {
     try {
       // Check cache first
       const cacheKey = 'loan_stats';
-      const cachedStats = cache.get(cacheKey);
+      const cachedStats = await cache.get(cacheKey);
       if (cachedStats) {
         return res.json(cachedStats);
       }
@@ -201,7 +236,7 @@ export class LoanController {
       };
 
       // Store in cache
-      cache.set(cacheKey, result);
+      await cache.set(cacheKey, result);
 
       res.json(result);
     } catch (error) {

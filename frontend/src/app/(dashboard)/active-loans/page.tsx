@@ -1,80 +1,77 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, VyapariCustomer, downloadCSV } from '@/lib/api';
+import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { useVyapariCustomers, useLoansByCustomer } from '@/lib/queries';
 import { Download, Search, Building, AlertCircle } from 'lucide-react';
 
+// Debounce hook for search optimization
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useState(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  });
+
+  return debouncedValue;
+}
+
 export default function ActiveLoansPage() {
-  const [vyapariCustomers, setVyapariCustomers] = useState<VyapariCustomer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
-  const [customerLoans, setCustomerLoans] = useState<Loan[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Use debounced search for better performance
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
+  // Use React Query hooks for data fetching with automatic caching
+  const { data: vyapariCustomers = [], isLoading: loading, error, refetch: fetchCustomers } = useVyapariCustomers();
+  const { data: customerLoans = [] } = useLoansByCustomer(selectedCustomer);
 
-  useEffect(() => {
-    if (selectedCustomer) {
-      fetchCustomerLoans(selectedCustomer);
-    }
-  }, [selectedCustomer]);
-
-  const fetchCustomers = async () => {
-    try {
-      setLoading(true);
-      const response = await loanApi.getVyapariCustomers();
-      const customers = response.data.sort((a, b) =>
-        a.customer_name.localeCompare(b.customer_name)
-      );
-      setVyapariCustomers(customers);
-      setError(null);
-    } catch (err) {
-      setError('Failed to fetch vyapari customers. Please ensure the backend server is running.');
-      console.error('Error fetching customers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCustomerLoans = async (customerName: string) => {
-    try {
-      const response = await loanApi.getByCustomer(customerName);
-      setCustomerLoans(response.data);
-    } catch (err) {
-      console.error('Error fetching customer loans:', err);
-    }
-  };
-
-  const handleDownloadCSV = async () => {
+  const handleDownloadCSV = useCallback(async () => {
     try {
       const response = await loanApi.downloadCSV();
       downloadCSV(response.data, 'active-vyapari-loans.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }
-  };
+  }, []);
 
-  const filteredCustomers = vyapariCustomers.filter((customer) =>
-    customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Memoize filtered customers to avoid recalculation on every render
+  const filteredCustomers = useMemo(() => {
+    if (!debouncedSearchTerm) return vyapariCustomers;
+    return vyapariCustomers.filter((customer) =>
+      customer.customer_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    );
+  }, [vyapariCustomers, debouncedSearchTerm]);
 
-  const activeLoans = customerLoans.filter((loan) => loan.released !== 'TRUE');
-  const releasedLoans = customerLoans.filter((loan) => loan.released === 'TRUE');
+  // Memoize active and released loans
+  const { activeLoans, releasedLoans } = useMemo(() => {
+    const active = customerLoans.filter((loan) => loan.released !== 'TRUE');
+    const released = customerLoans.filter((loan) => loan.released === 'TRUE');
+    return { activeLoans: active, releasedLoans: released };
+  }, [customerLoans]);
 
-  const totalOutstanding = activeLoans.reduce(
-    (sum, loan) => sum + (loan.pending_loan_amount || 0),
-    0
-  );
-  const totalReleased = releasedLoans.reduce(
-    (sum, loan) => sum + (loan.loan_amount || 0),
-    0
-  );
+  // Memoize totals
+  const { totalOutstanding, totalReleased } = useMemo(() => {
+    const outstanding = activeLoans.reduce(
+      (sum, loan) => sum + (loan.pending_loan_amount || 0),
+      0
+    );
+    const released = releasedLoans.reduce(
+      (sum, loan) => sum + (loan.loan_amount || 0),
+      0
+    );
+    return { totalOutstanding: outstanding, totalReleased: released };
+  }, [activeLoans, releasedLoans]);
 
   if (loading) {
     return (
@@ -90,10 +87,10 @@ export default function ActiveLoansPage() {
         <Card className="border-destructive">
           <CardHeader>
             <CardTitle>Connection Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
+            <CardDescription>Failed to fetch vyapari customers. Please ensure the backend server is running.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={fetchCustomers}>Retry</Button>
+            <Button onClick={() => fetchCustomers()}>Retry</Button>
           </CardContent>
         </Card>
       </div>
