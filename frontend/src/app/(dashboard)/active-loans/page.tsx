@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { loanApi, Loan, downloadCSV } from '@/lib/api';
+import { loanApi, downloadCSV } from '@/lib/api';
 import { useVyapariCustomers, useLoansByCustomer } from '@/lib/queries';
 import { Download, Search, Building, AlertCircle } from 'lucide-react';
 
@@ -12,7 +12,7 @@ import { Download, Search, Building, AlertCircle } from 'lucide-react';
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
-  useState(() => {
+  useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
@@ -20,7 +20,7 @@ function useDebounce<T>(value: T, delay: number): T {
     return () => {
       clearTimeout(handler);
     };
-  });
+  }, [value, delay]);
 
   return debouncedValue;
 }

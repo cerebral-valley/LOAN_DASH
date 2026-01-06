@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { loanApi, expenseApi, LoanStats, OverviewStats, Loan, Expense, ExpenseStats, VyapariCustomer } from './api';
+import { useQuery } from '@tanstack/react-query';
+import { loanApi, expenseApi } from './api';
 
 // Query keys for consistent caching
 export const QUERY_KEYS = {
