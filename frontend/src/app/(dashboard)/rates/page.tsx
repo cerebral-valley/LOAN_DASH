@@ -36,9 +36,10 @@ export default function RatesPage() {
       } catch (err) {
         console.warn('Moving average not available:', err);
       }
-    } catch (err: any) {
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } } | undefined;
       console.error('Error fetching rates:', err);
-      setError(err.response?.data?.error || 'Failed to load gold and silver rates. Please try again.');
+      setError(e?.response?.data?.error || 'Failed to load gold and silver rates. Please try again.');
     } finally {
       setIsLoading(false);
     }

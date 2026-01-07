@@ -124,13 +124,8 @@ export default function RiskAssessmentPage() {
         'Risk Level': r.riskLevel,
       }));
 
-      const csvString =
-        Object.keys(csvData[0]).join(',') +
-        '\n' +
-        csvData.map((row) => Object.values(row).join(',')).join('\n');
-
-      const blob = new Blob([csvString], { type: 'text/csv' });
-      downloadCSV(blob, 'risk-assessment.csv');
+      // Use exportToCSV utility to handle CSV export
+      exportToCSV(csvData, 'risk-assessment.csv');
     } catch (err) {
       console.error('Error downloading CSV:', err);
     }

@@ -104,8 +104,8 @@ export default function ProjectionsPage() {
       )
     ].join('\n');
 
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    downloadCSV(blob, 'revenue-projections.csv');
+    // Use exportToCSV utility which accepts an array of objects
+    exportToCSV(csvContent, 'revenue-projections.csv');
   };
 
   if (isLoading) {

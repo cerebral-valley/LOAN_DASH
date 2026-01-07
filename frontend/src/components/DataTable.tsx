@@ -145,13 +145,13 @@ export function DataTable<T extends Record<string, unknown>>({
     // Apply format based on type
     switch (column.format) {
       case 'currency':
-        return formatCurrency(value);
+        return typeof value === 'number' ? formatCurrency(value) : String(value);
       case 'date':
         return value instanceof Date ? formatDate(value) : String(value);
       case 'percentage':
-        return formatPercentage(value);
+        return typeof value === 'number' ? formatPercentage(value) : String(value);
       case 'number':
-        return typeof value === 'number' ? value.toLocaleString() : value;
+        return typeof value === 'number' ? value.toLocaleString() : String(value);
       case 'text':
       default:
         return String(value);
