@@ -12,7 +12,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useLoans } from '@/lib/queries';
-import { isLoanReleased } from '@/lib/api';
 import { Download, Users, TrendingUp, Award } from 'lucide-react';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
@@ -101,7 +100,6 @@ export default function CustomerAnalyticsPage() {
   // Destructure metrics for easier access
   const {
     sortedCustomers,
-    topCustomers,
     totalCustomers,
     repeatCustomers,
     avgLoansPerCustomer,

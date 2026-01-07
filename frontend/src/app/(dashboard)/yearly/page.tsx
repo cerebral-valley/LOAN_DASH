@@ -106,11 +106,6 @@ export default function YearlyPage() {
     if (!data[year]) return 0;
     return Object.values(data[year]).reduce((sum, month) => sum + month[type], 0);
   };
-  
-  // Helper to determine if a year should show monthly breakdown
-  const shouldShowMonthly = (year: string) => {
-    return year === '2024' || year === '2025';
-  };
 
   if (isLoading) {
     return <LoadingState />;

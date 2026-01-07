@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { VyapariCustomer } from '@/lib/api';
 import { useLoans, useVyapariCustomers } from '@/lib/queries';
 import { Download, Search, Filter } from 'lucide-react';
 import { extractUniqueYears, filterLoansByCustomerType, filterLoansByCustomer } from '@/lib/loan-utils';

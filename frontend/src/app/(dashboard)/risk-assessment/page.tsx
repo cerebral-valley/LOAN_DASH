@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +15,6 @@ import { useActiveLoans } from '@/lib/queries';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
-import { loanApi } from '@/lib/api';
 import { Download, AlertTriangle, Shield, TrendingDown } from 'lucide-react';
 
 interface RiskMetrics {

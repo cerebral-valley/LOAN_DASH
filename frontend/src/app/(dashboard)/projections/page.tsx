@@ -8,7 +8,6 @@ import { useLoans } from '@/lib/queries';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
-import { loanApi } from '@/lib/api';
 import { Download, TrendingUp, Calculator, DollarSign, Calendar } from 'lucide-react';
 
 interface MonthlyProjection {
@@ -96,13 +95,6 @@ export default function ProjectionsPage() {
       'Projected New Disbursements': proj.projectedNewDisbursements.toFixed(2),
       'Expected Outstanding': proj.expectedOutstanding.toFixed(2),
     }));
-
-    const csvString = [
-      Object.keys(csvContent[0]).join(','),
-      ...csvContent.map((row) =>
-        Object.values(row).join(',')
-      )
-    ].join('\n');
 
     // Use exportToCSV utility which accepts an array of objects
     exportToCSV(csvContent, 'revenue-projections.csv');

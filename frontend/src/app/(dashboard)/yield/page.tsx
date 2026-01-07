@@ -37,19 +37,10 @@ interface HoldingPeriodSegment {
   loanCount: number;
 }
 
-interface LoanAmountBucket {
-  range: string;
-  portfolioYield: number;
-  capital: number;
-  portfolioPercentage: number;
-  loanCount: number;
-  avgDays: number;
-}
-
 export default function YieldPage() {
   const { data: allLoans = [], isLoading, error, refetch } = useLoans();
 
-  const { metrics, holdingPeriodSegments, loanAmountBuckets, releasedLoans } = useMemo(() => {
+  const { metrics, holdingPeriodSegments, loanAmountBuckets } = useMemo(() => {
     // Filter released loans only
     const released = allLoans.filter(
       (loan) =>

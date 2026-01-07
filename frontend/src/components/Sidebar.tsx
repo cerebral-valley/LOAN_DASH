@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
-  FileText,
   Calendar,
   Users,
   Briefcase,
@@ -20,7 +19,6 @@ import {
   Activity,
   CreditCard,
   TrendingDown,
-  Target,
   FileSpreadsheet,
   Calculator,
   Scale,

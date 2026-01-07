@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLoans, useExpenses } from '@/lib/queries';
-import { useDownloadLoanCSV } from '@/lib/hooks';
 import { Download, TrendingUp, DollarSign, PieChart, Target } from 'lucide-react';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
@@ -12,7 +11,6 @@ import ErrorState from '@/components/ErrorState';
 export default function ProfitabilityPage() {
   const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans();
   const { data: expenses = [], isLoading: expensesLoading, error: expensesError, refetch: refetchExpenses } = useExpenses();
-  const { download: downloadCSV } = useDownloadLoanCSV();
 
   const isLoading = loansLoading || expensesLoading;
   const error = loansError || expensesError;
