@@ -52,10 +52,38 @@ python verify_script.py  # Tries to run from PREVIOUS directory
 
 ### Solutions
 
+#### ✅ DO: Always Check Backend Status Before Restarting
+```powershell
+# CRITICAL: Test if backend is responding before attempting restart
+curl http://localhost:3001/health
+# OR
+Invoke-WebRequest -Uri http://localhost:3001/health
+```
+
+**Why this matters:**
+- Prevents unnecessary restarts of working servers
+- Avoids "EADDRINUSE" errors from multiple instances
+- Confirms actual issues vs. false positives
+
+#### ✅ DO: Use Proper Backend Restart Sequence
+```powershell
+# Step 1: Check if backend is running and responding
+curl http://localhost:3001/health
+
+# Step 2: If not responding, find and kill the process
+Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*backend*" } | Stop-Process -Force
+
+# Step 3: Navigate to backend directory with absolute path
+cd z:\Loan_Dash\backend
+
+# Step 4: Start the backend server
+npm run dev
+```
+
 #### ✅ DO: Use Simple, Single-Purpose Commands
 ```powershell
 # GOOD: One operation per command
-cd backend
+cd z:\Loan_Dash\backend
 npm run dev
 ```
 
