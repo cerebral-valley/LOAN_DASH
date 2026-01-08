@@ -223,7 +223,10 @@ export class LoanController {
         )
         .addSelect('SUM(loan.loan_amount)', 'totalDisbursed')
         .addSelect('SUM(loan.pending_loan_amount)', 'totalOutstanding')
-        .addSelect('SUM(loan.interest_deposited_till_date)', 'totalInterestReceived')
+        .addSelect(
+          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.interest_amount ELSE loan.interest_deposited_till_date END)",
+          'totalInterestReceived'
+        )
         .getRawOne();
 
       const result = {
@@ -309,7 +312,10 @@ export class LoanController {
       const stats = await this.loanRepository
         .createQueryBuilder('loan')
         .select('SUM(loan.loan_amount)', 'totalDisbursed')
-        .addSelect('SUM(loan.interest_deposited_till_date)', 'totalInterestReceived')
+        .addSelect(
+          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.interest_amount ELSE loan.interest_deposited_till_date END)",
+          'totalInterestReceived'
+        )
         .addSelect('COUNT(*)', 'totalLoans')
         .addSelect(
           "SUM(CASE WHEN loan.released != 'TRUE' OR loan.released IS NULL THEN 1 ELSE 0 END)",
