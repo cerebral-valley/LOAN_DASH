@@ -241,6 +241,8 @@ export const loanApi = {
   },
   getStats: () => api.get<LoanStats>('/loans/stats'),
   getOverviewStats: () => api.get<OverviewStats>('/loans/overview/stats'),
+  getYieldStats: () => api.get<any>('/loans/yield/stats'),
+  getYearlyBreakdown: () => api.get<any[]>('/loans/yearly/breakdown'),
   downloadCSV: () => api.get('/loans/download/csv', { responseType: 'blob' }),
 };
 

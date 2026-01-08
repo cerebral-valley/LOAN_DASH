@@ -365,4 +365,61 @@ export class LoanController {
       res.status(500).json({ error: 'Failed to fetch overview stats' });
     }
   };
+
+  getYieldStats = async (req: Request, res: Response) => {
+    try {
+      const cacheKey = 'yield_stats';
+      const cachedStats = await cache.get(cacheKey);
+      if (cachedStats) return res.json(cachedStats);
+
+      const stats = await this.loanRepository
+        .createQueryBuilder('loan')
+        .select('SUM(loan.loan_amount)', 'totalCapital')
+        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)", 'totalInterest')
+        .addSelect("AVG(DATEDIFF(COALESCE(loan.date_of_release, NOW()), loan.date_of_disbursement))", 'avgDays')
+        .where("loan.date_of_disbursement IS NOT NULL")
+        .getRawOne();
+
+      const result = {
+        totalCapital: parseFloat(stats.totalCapital) || 0,
+        totalInterest: parseFloat(stats.totalInterest) || 0,
+        avgDays: Math.round(parseFloat(stats.avgDays)) || 0,
+        portfolioYield: stats.totalCapital > 0 ? (stats.totalInterest / stats.totalCapital) * (365 / stats.avgDays) * 100 : 0
+      };
+      await cache.set(cacheKey, result);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching yield stats:', error);
+      res.status(500).json({ error: 'Failed to fetch yield stats' });
+    }
+  };
+
+  getYearlyBreakdown = async (req: Request, res: Response) => {
+    try {
+      const cacheKey = 'yearly_breakdown';
+      const cachedStats = await cache.get(cacheKey);
+      if (cachedStats) return res.json(cachedStats);
+
+      const breakdown = await this.loanRepository
+        .createQueryBuilder('loan')
+        .select("YEAR(loan.date_of_disbursement)", "year")
+        .addSelect("MONTH(loan.date_of_disbursement)", "month")
+        .addSelect("SUM(loan.loan_amount)", "disbursedAmount")
+        .addSelect("COUNT(*)", "disbursedCount")
+        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.loan_amount ELSE 0 END)", "releasedAmount")
+        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN 1 ELSE 0 END)", "releasedCount")
+        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)", "interestReceived")
+        .where("loan.date_of_disbursement >= '2020-01-01'")
+        .groupBy("YEAR(loan.date_of_disbursement), MONTH(loan.date_of_disbursement)")
+        .orderBy("year", "DESC")
+        .addOrderBy("month", "DESC")
+        .getRawMany();
+
+      await cache.set(cacheKey, breakdown);
+      res.json(breakdown);
+    } catch (error) {
+      console.error('Error fetching yearly breakdown:', error);
+      res.status(500).json({ error: 'Failed to fetch yearly breakdown' });
+    }
+  };
 }

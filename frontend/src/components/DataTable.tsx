@@ -52,6 +52,8 @@ export function DataTable<T extends Record<string, unknown>>({
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
 
   // Handle sorting
   const sortedData = useMemo(() => {
@@ -168,6 +170,9 @@ export function DataTable<T extends Record<string, unknown>>({
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
+  const totalPages = Math.ceil(sortedData.length / pageSize);
+  const paginatedData = sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className={className}>
       {showExport && exportFilename && (
@@ -199,14 +204,14 @@ export function DataTable<T extends Record<string, unknown>>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedData.length === 0 ? (
+            {paginatedData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
                   {emptyMessage}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedData.map((row, index) => (
+              paginatedData.map((row, index) => (
                 <TableRow key={index}>
                   {columns.map((column) => (
                     <TableCell
@@ -222,6 +227,30 @@ export function DataTable<T extends Record<string, unknown>>({
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,12 @@ router.get('/stats', loanController.getLoanStats);
 // Get overview statistics
 router.get('/overview/stats', loanController.getOverviewStats);
 
+// Get yield statistics
+router.get('/yield/stats', loanController.getYieldStats);
+
+// Get yearly breakdown
+router.get('/yearly/breakdown', loanController.getYearlyBreakdown);
+
 // Get vyapari customers
 router.get('/vyapari/customers', loanController.getVyapariCustomers);
 

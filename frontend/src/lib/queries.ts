@@ -14,6 +14,8 @@ export const QUERY_KEYS = {
     vyapariCustomers: () => ['loans', 'vyapari', 'customers'] as const,
     stats: () => ['loans', 'stats'] as const,
     overviewStats: () => ['loans', 'overview', 'stats'] as const,
+    yieldStats: () => ['loans', 'yield', 'stats'] as const,
+    yearlyBreakdown: () => ['loans', 'yearly', 'breakdown'] as const,
   },
   expenses: {
     all: ['expenses'] as const,
@@ -117,6 +119,28 @@ export function useOverviewStats() {
       return response.data;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+}
+
+export function useYieldStats() {
+  return useQuery({
+    queryKey: QUERY_KEYS.loans.yieldStats(),
+    queryFn: async () => {
+      const response = await loanApi.getYieldStats();
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useYearlyBreakdown() {
+  return useQuery({
+    queryKey: QUERY_KEYS.loans.yearlyBreakdown(),
+    queryFn: async () => {
+      const response = await loanApi.getYearlyBreakdown();
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
 
