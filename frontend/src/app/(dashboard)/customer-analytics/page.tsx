@@ -57,12 +57,10 @@ export default function CustomerAnalyticsPage() {
       if (loan.released !== 'TRUE') {
         acc[customerId].totalOutstanding += loan.pending_loan_amount || 0;
         acc[customerId].activeLoans++;
-        // For active loans, use interest_deposited_till_date
-        acc[customerId].totalInterestPaid += loan.interest_deposited_till_date || 0;
-      } else {
-        // For released loans, use interest_amount
-        acc[customerId].totalInterestPaid += loan.interest_amount || 0;
       }
+      
+      // Always use interest_amount for all loans
+      acc[customerId].totalInterestPaid += loan.interest_amount || 0;
 
       return acc;
     }, {} as Record<string, CustomerMetrics>);
