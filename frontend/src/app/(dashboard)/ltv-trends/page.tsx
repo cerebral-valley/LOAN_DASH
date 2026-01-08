@@ -19,7 +19,7 @@ import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 
 export default function LTVTrendsPage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000);
 
   // Calculate LTV metrics
   const metrics = useMemo(() => {

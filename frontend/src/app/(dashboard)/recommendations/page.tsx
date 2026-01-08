@@ -30,7 +30,7 @@ interface PortfolioMetrics {
 }
 
 export default function RecommendationsPage() {
-  const { data: loansData = [], isLoading, error, refetch } = useLoans();
+  const { data: loansData = [], isLoading, error, refetch } = useLoans(1, 50000);
 
   const { metrics, recommendations } = useMemo(() => {
     // Calculate metrics

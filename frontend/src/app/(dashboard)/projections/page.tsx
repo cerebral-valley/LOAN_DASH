@@ -22,7 +22,7 @@ interface MonthlyProjection {
 const DEFAULT_INTEREST_RATE = 12; // 12% per annum
 
 export default function ProjectionsPage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000);
 
   const { projections, totalProjectedRevenue } = useMemo(() => {
     const activeLoans = loans.filter((loan) => loan.released !== 'TRUE');

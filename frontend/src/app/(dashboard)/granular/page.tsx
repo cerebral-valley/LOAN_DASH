@@ -19,7 +19,7 @@ const MONTHS = [
 ];
 
 export default function GranularPage() {
-  const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans();
+  const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans(1, 50000);
   const { data: vyapariCustomers = [], isLoading: customersLoading, error: customersError, refetch: refetchCustomers } = useVyapariCustomers();
 
   const isLoading = loansLoading || customersLoading;

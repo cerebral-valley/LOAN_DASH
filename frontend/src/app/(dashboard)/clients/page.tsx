@@ -25,7 +25,7 @@ interface YearlyCustomerData {
 }
 
 export default function ClientsPage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000);
   const { download: downloadCSV } = useDownloadLoanCSV();
 
   // Calculate customer type aggregates for active loans (released = FALSE)

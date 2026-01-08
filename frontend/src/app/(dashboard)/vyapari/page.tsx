@@ -21,7 +21,7 @@ interface VyapariYearlyData {
 }
 
 export default function VyapariPage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000); // Fetch all loans
   const { download: downloadCSV } = useDownloadLoanCSV();
 
   // Filter vyapari loans and calculate data

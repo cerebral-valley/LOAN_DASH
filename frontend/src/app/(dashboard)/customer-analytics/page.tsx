@@ -29,7 +29,7 @@ interface CustomerMetrics {
 }
 
 export default function CustomerAnalyticsPage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000); // Fetch all loans
 
   // Calculate customer-wise metrics
   const metrics = useMemo(() => {

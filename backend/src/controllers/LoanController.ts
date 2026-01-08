@@ -9,6 +9,19 @@ export class LoanController {
 
   getAllLoans = async (req: Request, res: Response) => {
     try {
+      // Check if requesting all loans without pagination
+      const all = req.query.all === 'true';
+      
+      if (all) {
+        // Return all loans without pagination for analysis pages
+        const loans = await this.loanRepository.find({
+          order: {
+            loan_number: 'DESC',
+          },
+        });
+        return res.json({ data: loans, pagination: null });
+      }
+
       // Add pagination support with validation
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));

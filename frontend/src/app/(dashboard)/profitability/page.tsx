@@ -9,7 +9,7 @@ import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 
 export default function ProfitabilityPage() {
-  const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans();
+  const { data: loans = [], isLoading: loansLoading, error: loansError, refetch: refetchLoans } = useLoans(1, 50000);
   const { data: expenses = [], isLoading: expensesLoading, error: expensesError, refetch: refetchExpenses } = useExpenses();
 
   const isLoading = loansLoading || expensesLoading;

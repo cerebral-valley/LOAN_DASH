@@ -30,7 +30,7 @@ interface PerformanceByType {
 }
 
 export default function PerformancePage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans();
+  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000);
 
   // Helper to safely get numeric value
   const safeNumber = (value: number | undefined | null): number => {
