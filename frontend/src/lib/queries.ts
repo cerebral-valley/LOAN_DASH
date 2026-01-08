@@ -107,7 +107,7 @@ export function useLoanStats() {
       return response.data;
     },
     // Stats are cached longer since they change less frequently
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -118,7 +118,7 @@ export function useOverviewStats() {
       const response = await loanApi.getOverviewStats();
       return response.data;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -129,7 +129,7 @@ export function useYieldStats() {
       const response = await loanApi.getYieldStats();
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -140,7 +140,7 @@ export function useYearlyBreakdown() {
       const response = await loanApi.getYearlyBreakdown();
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -173,6 +173,6 @@ export function useExpenseStats() {
       const response = await expenseApi.getStats();
       return response.data;
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
   });
 }

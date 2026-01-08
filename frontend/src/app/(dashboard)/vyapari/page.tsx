@@ -26,9 +26,9 @@ export default function VyapariPage() {
 
   // Filter vyapari loans and calculate data
   const { vyapariLoans, vyapariCustomers, yearlyData, years } = useMemo(() => {
-    // Filter vyapari loans that are active (released = FALSE)
+    // Filter all vyapari loans (both active and released)
     const vyapariLoansData = loans.filter(
-      (loan) => loan.customer_type?.toUpperCase().trim() === 'VYAPARI' && loan.released !== 'TRUE'
+      (loan) => loan.customer_type?.toUpperCase().trim() === 'VYAPARI'
     );
 
     // Get unique vyapari customers

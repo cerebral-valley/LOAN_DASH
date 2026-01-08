@@ -224,7 +224,7 @@ export class LoanController {
         .addSelect('SUM(loan.loan_amount)', 'totalDisbursed')
         .addSelect('SUM(loan.pending_loan_amount)', 'totalOutstanding')
         .addSelect(
-          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)",
+          "SUM(COALESCE(loan.interest_amount, 0) + COALESCE(loan.interest_deposited_till_date, 0))",
           'totalInterestReceived'
         )
         .getRawOne();
@@ -313,7 +313,7 @@ export class LoanController {
         .createQueryBuilder('loan')
         .select('SUM(loan.loan_amount)', 'totalDisbursed')
         .addSelect(
-          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)",
+          "SUM(COALESCE(loan.interest_amount, 0) + COALESCE(loan.interest_deposited_till_date, 0))",
           'totalInterestReceived'
         )
         .addSelect('COUNT(*)', 'totalLoans')
@@ -375,7 +375,7 @@ export class LoanController {
       const stats = await this.loanRepository
         .createQueryBuilder('loan')
         .select('SUM(loan.loan_amount)', 'totalCapital')
-        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)", 'totalInterest')
+        .addSelect("SUM(COALESCE(loan.interest_amount, 0) + COALESCE(loan.interest_deposited_till_date, 0))", 'totalInterest')
         .addSelect("AVG(DATEDIFF(COALESCE(loan.date_of_release, NOW()), loan.date_of_disbursement))", 'avgDays')
         .where("loan.date_of_disbursement IS NOT NULL")
         .getRawOne();
@@ -408,7 +408,7 @@ export class LoanController {
         .addSelect("COUNT(*)", "disbursedCount")
         .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.loan_amount ELSE 0 END)", "releasedAmount")
         .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN 1 ELSE 0 END)", "releasedCount")
-        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)", "interestReceived")
+        .addSelect("SUM(COALESCE(loan.interest_amount, 0) + COALESCE(loan.interest_deposited_till_date, 0))", "interestReceived")
         .where("loan.date_of_disbursement >= '2020-01-01'")
         .groupBy("YEAR(loan.date_of_disbursement), MONTH(loan.date_of_disbursement)")
         .orderBy("year", "DESC")

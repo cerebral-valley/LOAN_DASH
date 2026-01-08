@@ -24,6 +24,24 @@ export default function YearlyPage() {
 
   const years = Object.keys(yearsData).sort((a, b) => parseInt(b) - parseInt(a));
 
+  const calculateYearTotal = (year: string, field: string) => {
+    return MONTHS.reduce((sum, month) => {
+      return sum + (parseFloat(yearsData[year][month]?.[field]) || 0);
+    }, 0);
+  };
+
+  const calculateYOYChange = (year: string, month: string, field: string) => {
+    const currentYear = parseInt(year);
+    const prevYear = (currentYear - 1).toString();
+    
+    const currentVal = parseFloat(yearsData[year][month]?.[field]) || 0;
+    const prevVal = parseFloat(yearsData[prevYear]?.[month]?.[field]) || 0;
+
+    if (prevVal === 0) return null;
+    const change = ((currentVal - prevVal) / prevVal) * 100;
+    return change.toFixed(1);
+  };
+
   if (isLoading) {
     return <LoadingState />;
   }
@@ -41,6 +59,7 @@ export default function YearlyPage() {
         </p>
       </div>
 
+      {/* Disbursed Loans */}
       <div className="mb-8">
         <Card>
           <CardHeader>
@@ -56,6 +75,7 @@ export default function YearlyPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="font-bold">Year</TableHead>
+                    <TableHead className="text-right font-bold">Total</TableHead>
                     {MONTHS.map((month) => (
                       <TableHead key={month} className="text-right">{month}</TableHead>
                     ))}
@@ -65,13 +85,26 @@ export default function YearlyPage() {
                   {years.map((year) => (
                     <TableRow key={year}>
                       <TableCell className="font-medium">{year}</TableCell>
-                      {MONTHS.map((month) => (
-                        <TableCell key={month} className="text-right">
-                          {yearsData[year][month]
-                            ? `₹${parseFloat(yearsData[year][month].disbursedAmount).toLocaleString('en-IN')}`
-                            : '-'}
-                        </TableCell>
-                      ))}
+                      <TableCell className="text-right font-bold">
+                        ₹{Math.round(calculateYearTotal(year, 'disbursedAmount')).toLocaleString('en-IN')}
+                      </TableCell>
+                      {MONTHS.map((month) => {
+                        const yoy = calculateYOYChange(year, month, 'disbursedAmount');
+                        return (
+                          <TableCell key={month} className="text-right">
+                            <div>
+                              {yearsData[year][month]
+                                ? `₹${Math.round(parseFloat(yearsData[year][month].disbursedAmount)).toLocaleString('en-IN')}`
+                                : '-'}
+                            </div>
+                            {yoy && (
+                              <div className={`text-[10px] ${parseFloat(yoy) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                ({yoy}%)
+                              </div>
+                            )}
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -81,6 +114,7 @@ export default function YearlyPage() {
         </Card>
       </div>
 
+      {/* Interest Received */}
       <div className="mb-8">
         <Card>
           <CardHeader>
@@ -93,6 +127,7 @@ export default function YearlyPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="font-bold">Year</TableHead>
+                    <TableHead className="text-right font-bold">Total</TableHead>
                     {MONTHS.map((month) => (
                       <TableHead key={month} className="text-right">{month}</TableHead>
                     ))}
@@ -102,13 +137,26 @@ export default function YearlyPage() {
                   {years.map((year) => (
                     <TableRow key={year}>
                       <TableCell className="font-medium">{year}</TableCell>
-                      {MONTHS.map((month) => (
-                        <TableCell key={month} className="text-right">
-                          {yearsData[year][month]
-                            ? `₹${parseFloat(yearsData[year][month].interestReceived).toLocaleString('en-IN')}`
-                            : '-'}
-                        </TableCell>
-                      ))}
+                      <TableCell className="text-right font-bold">
+                        ₹{Math.round(calculateYearTotal(year, 'interestReceived')).toLocaleString('en-IN')}
+                      </TableCell>
+                      {MONTHS.map((month) => {
+                        const yoy = calculateYOYChange(year, month, 'interestReceived');
+                        return (
+                          <TableCell key={month} className="text-right">
+                            <div>
+                              {yearsData[year][month]
+                                ? `₹${Math.round(parseFloat(yearsData[year][month].interestReceived)).toLocaleString('en-IN')}`
+                                : '-'}
+                            </div>
+                            {yoy && (
+                              <div className={`text-[10px] ${parseFloat(yoy) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                ({yoy}%)
+                              </div>
+                            )}
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
