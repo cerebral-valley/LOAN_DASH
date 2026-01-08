@@ -196,7 +196,7 @@ interface PaginatedResponse<T> {
 
 // Loan API calls
 export const loanApi = {
-  getAll: async (page = 1, limit = 1000) => {
+  getAll: async (page = 1, limit = 100) => {
     const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
     const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
@@ -207,28 +207,28 @@ export const loanApi = {
     const response = await api.get<Record<string, unknown>>(`/loans/${id}`);
     return { ...response, data: transformLoan(response.data) };
   },
-  getActive: async (page = 1, limit = 1000) => {
+  getActive: async (page = 1, limit = 100) => {
     const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/active?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
     const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
-  getReleased: async (page = 1, limit = 1000) => {
+  getReleased: async (page = 1, limit = 100) => {
     const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/released?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
     const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
-  getByCustomerType: async (type: string, page = 1, limit = 1000) => {
+  getByCustomerType: async (type: string, page = 1, limit = 100) => {
     const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/customer-type/${type}?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
     const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
     const loans = Array.isArray(data) ? data : [];
     return { ...response, data: loans.map(transformLoan) };
   },
-  getByCustomer: async (customerName: string, page = 1, limit = 1000) => {
+  getByCustomer: async (customerName: string, page = 1, limit = 100) => {
     const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/loans/customer/${customerName}?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
     const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;
@@ -246,7 +246,7 @@ export const loanApi = {
 
 // Expense API calls
 export const expenseApi = {
-  getAll: async (page = 1, limit = 1000) => {
+  getAll: async (page = 1, limit = 100) => {
     const response = await api.get<PaginatedResponse<Record<string, unknown>> | Record<string, unknown>[]>(`/expenses?page=${page}&limit=${limit}`);
     // Handle both old and new response formats
     const data = (response.data as PaginatedResponse<Record<string, unknown>>).data || response.data;

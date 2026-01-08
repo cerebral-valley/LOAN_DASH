@@ -18,7 +18,13 @@ export function sumOutstanding(loans: Loan[]): number {
  * Sum the interest_deposited_till_date field from an array of loans
  */
 export function sumInterest(loans: Loan[]): number {
-  return loans.reduce((sum, loan) => sum + (loan.interest_deposited_till_date || 0), 0);
+  return loans.reduce((sum, loan) => {
+    const isReleased = loan.released?.toUpperCase() === 'TRUE';
+    const interest = isReleased 
+      ? (loan.interest_amount || 0) 
+      : (loan.interest_deposited_till_date || 0);
+    return sum + interest;
+  }, 0);
 }
 
 /**

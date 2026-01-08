@@ -24,7 +24,7 @@ export const QUERY_KEYS = {
 };
 
 // Loan hooks
-export function useLoans(page = 1, limit = 1000) {
+export function useLoans(page = 1, limit = 100) {
   return useQuery({
     queryKey: QUERY_KEYS.loans.list(page, limit),
     queryFn: async () => {
@@ -45,7 +45,7 @@ export function useLoan(id: number) {
   });
 }
 
-export function useActiveLoans(page = 1, limit = 1000) {
+export function useActiveLoans(page = 1, limit = 100) {
   return useQuery({
     queryKey: QUERY_KEYS.loans.active(page, limit),
     queryFn: async () => {
@@ -55,7 +55,7 @@ export function useActiveLoans(page = 1, limit = 1000) {
   });
 }
 
-export function useReleasedLoans(page = 1, limit = 1000) {
+export function useReleasedLoans(page = 1, limit = 100) {
   return useQuery({
     queryKey: QUERY_KEYS.loans.released(page, limit),
     queryFn: async () => {
@@ -65,7 +65,7 @@ export function useReleasedLoans(page = 1, limit = 1000) {
   });
 }
 
-export function useLoansByCustomerType(type: string, page = 1, limit = 1000) {
+export function useLoansByCustomerType(type: string, page = 1, limit = 100) {
   return useQuery({
     queryKey: QUERY_KEYS.loans.byType(type, page, limit),
     queryFn: async () => {
@@ -76,7 +76,7 @@ export function useLoansByCustomerType(type: string, page = 1, limit = 1000) {
   });
 }
 
-export function useLoansByCustomer(customerName: string, page = 1, limit = 1000) {
+export function useLoansByCustomer(customerName: string, page = 1, limit = 100) {
   return useQuery({
     queryKey: QUERY_KEYS.loans.byCustomer(customerName, page, limit),
     queryFn: async () => {
@@ -121,7 +121,7 @@ export function useOverviewStats() {
 }
 
 // Expense hooks
-export function useExpenses(page = 1, limit = 1000) {
+export function useExpenses(page = 1, limit = 100) {
   return useQuery({
     queryKey: QUERY_KEYS.expenses.list(page, limit),
     queryFn: async () => {

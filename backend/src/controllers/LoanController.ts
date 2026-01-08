@@ -224,7 +224,7 @@ export class LoanController {
         .addSelect('SUM(loan.loan_amount)', 'totalDisbursed')
         .addSelect('SUM(loan.pending_loan_amount)', 'totalOutstanding')
         .addSelect(
-          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.interest_amount ELSE loan.interest_deposited_till_date END)",
+          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)",
           'totalInterestReceived'
         )
         .getRawOne();
@@ -313,7 +313,7 @@ export class LoanController {
         .createQueryBuilder('loan')
         .select('SUM(loan.loan_amount)', 'totalDisbursed')
         .addSelect(
-          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.interest_amount ELSE loan.interest_deposited_till_date END)",
+          "SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN COALESCE(loan.interest_amount, 0) ELSE COALESCE(loan.interest_deposited_till_date, 0) END)",
           'totalInterestReceived'
         )
         .addSelect('COUNT(*)', 'totalLoans')

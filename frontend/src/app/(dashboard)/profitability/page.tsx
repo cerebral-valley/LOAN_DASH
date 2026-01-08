@@ -17,10 +17,10 @@ export default function ProfitabilityPage() {
 
   // Calculate profitability metrics
   const metrics = useMemo(() => {
-    const totalInterestReceived = loans.reduce(
-      (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
-      0
-    );
+    const totalInterestReceived = loans.reduce((sum, loan) => {
+      const isReleased = loan.released?.toUpperCase() === 'TRUE';
+      return sum + (isReleased ? (loan.interest_amount || 0) : (loan.interest_deposited_till_date || 0));
+    }, 0);
 
     const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
 
@@ -52,10 +52,10 @@ export default function ProfitabilityPage() {
         return date && date.getFullYear() === currentYear && date.getMonth() === month;
       });
 
-      const monthInterest = monthLoans.reduce(
-        (sum, loan) => sum + (loan.interest_deposited_till_date || 0),
-        0
-      );
+      const monthInterest = monthLoans.reduce((sum, loan) => {
+        const isReleased = loan.released?.toUpperCase() === 'TRUE';
+        return sum + (isReleased ? (loan.interest_amount || 0) : (loan.interest_deposited_till_date || 0));
+      }, 0);
 
       const monthExpense = monthExpenses.reduce(
         (sum, expense) => sum + (expense.amount || 0),
