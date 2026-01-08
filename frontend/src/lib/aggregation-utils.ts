@@ -19,7 +19,11 @@ export function sumOutstanding(loans: Loan[]): number {
  */
 export function sumInterest(loans: Loan[]): number {
   return loans.reduce((sum, loan) => {
-    return sum + (loan.interest_amount || 0) + (loan.interest_deposited_till_date || 0);
+    const isReleased = loan.released?.toUpperCase() === 'TRUE';
+    const interest = isReleased 
+      ? (loan.interest_amount || 0) 
+      : (loan.interest_deposited_till_date || 0);
+    return sum + interest;
   }, 0);
 }
 
