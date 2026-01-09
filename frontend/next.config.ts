@@ -1,14 +1,62 @@
 import type { NextConfig } from "next";
+import crypto from 'crypto';
 
 const nextConfig: NextConfig = {
   /* config options here */
-  // Disable webpack caching and file watching for network drive compatibility
-  webpack: (config, { dev }) => {
+  // Optimize webpack for faster builds while maintaining network drive compatibility
+  webpack: (config, { dev, isServer }) => {
     if (dev) {
-      config.cache = false;
+      // Use memory cache in dev for faster rebuilds (works on network drives)
+      config.cache = { type: 'memory' };
       // Completely disable file watching for network drives
       config.watchOptions = {
         ignored: ['**/*'],  // Ignore all files - no hot reload
+      };
+    }
+    
+    // Add tree shaking and code splitting optimizations for production
+    if (!dev && !isServer) {
+      config.optimization.splitChunks = {
+        chunks: 'all',
+        maxInitialRequests: 25,
+        minSize: 20000,
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          framework: {
+            chunks: 'all',
+            name: 'framework',
+            test: /[\\/]node_modules[\\/](react|react-dom|scheduler|prop-types|use-subscription)[\\/]/,
+            priority: 40,
+            enforce: true,
+          },
+          lib: {
+            test(module: any) {
+              return module.size() > 50000 && /node_modules/.test(module.identifier());
+            },
+            name(module: any) {
+              const hash = crypto.createHash('sha1');
+              hash.update(module.libIdent({ context: 'dir' }));
+              return hash.digest('hex').substring(0, 8);
+            },
+            priority: 30,
+            minChunks: 1,
+            reuseExistingChunk: true,
+          },
+          commons: {
+            name: 'commons',
+            minChunks: 2,
+            priority: 20,
+          },
+          shared: {
+            name(module: any, chunks: any) {
+              return chunks.map((c: any) => c.name).join('~');
+            },
+            priority: 10,
+            minChunks: 2,
+            reuseExistingChunk: true,
+          },
+        },
       };
     }
     return config;
