@@ -6,6 +6,8 @@
     "dev": "next dev -p 5813",
     "dev:turbo": "next dev -p 5813 --turbopack",
     "build": "next build",
+    "build:analyze": "cross-env ANALYZE=true next build",
+    "perf": "node scripts/perf-monitor.js",
     "start": "next start -p 5813",
     "lint": "eslint"
   },
@@ -27,10 +29,12 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.1.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "^15.5.9",
     "tailwindcss": "^4",

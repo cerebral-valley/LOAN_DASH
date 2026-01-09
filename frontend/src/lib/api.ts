@@ -176,6 +176,97 @@ export interface VyapariCustomer {
   customer_type: string;
 }
 
+export interface PerformanceByType {
+  type: string;
+  count: number;
+  disbursed: number;
+  collected: number;
+  outstanding: number;
+  interestReceived: number;
+  collectionRate: number;
+  yieldRate: number;
+}
+
+export interface PerformanceStats {
+  totalDisbursed: number;
+  totalInterestReceived: number;
+  collectionRate: number;
+  interestYield: number;
+  activeRate: number;
+  activeLoansCount: number;
+  releasedLoansCount: number;
+  performanceData: PerformanceByType[];
+}
+
+export interface PortfolioByType {
+  type: string;
+  count: number;
+  totalAmount: number;
+  totalOutstanding: number;
+  activeLoans: number;
+  releasedLoans: number;
+  avgLoanSize: number;
+}
+
+export interface LTVDistribution {
+  range: string;
+  count: number;
+  totalValue: number;
+}
+
+export interface PortfolioStats {
+  portfolioByType: PortfolioByType[];
+  ltvDistribution: LTVDistribution[];
+  totalLoans: number;
+  activeLoans: number;
+}
+
+export interface TopCustomer {
+  name: string;
+  type: string;
+  totalLoans: number;
+  totalDisbursed: number;
+  totalOutstanding: number;
+  interestReceived: number;
+  activeLoans: number;
+  releasedLoans: number;
+  avgLoanSize: number;
+}
+
+export interface CustomerTypeData {
+  type: string;
+  uniqueCustomers: number;
+  totalLoans: number;
+  totalDisbursed: number;
+  avgLoansPerCustomer: number;
+  avgDisbursement: number;
+}
+
+export interface CustomerAnalytics {
+  topCustomers: TopCustomer[];
+  byCustomerType: CustomerTypeData[];
+  totalUniqueCustomers: number;
+  totalLoans: number;
+}
+
+export interface ProfitByType {
+  type: string;
+  count: number;
+  revenue: number;
+  disbursed: number;
+  avgYield: number;
+}
+
+export interface ProfitabilityStats {
+  overall: {
+    totalRevenue: number;
+    totalDisbursed: number;
+    avgYield: number;
+    releasedLoans: number;
+  };
+  byProductType: ProfitByType[];
+}
+
 export interface ExpenseStats {
   totalExpenses: number;
   totalAmount: number;
@@ -243,6 +334,10 @@ export const loanApi = {
   getOverviewStats: () => api.get<OverviewStats>('/loans/overview/stats'),
   getYieldStats: () => api.get<any>('/loans/yield/stats'),
   getYearlyBreakdown: () => api.get<any[]>('/loans/yearly/breakdown'),
+  getPerformanceStats: () => api.get<PerformanceStats>('/loans/performance/stats'),
+  getPortfolioStats: () => api.get<PortfolioStats>('/loans/portfolio/stats'),
+  getCustomerAnalytics: () => api.get<CustomerAnalytics>('/loans/customer-analytics'),
+  getProfitabilityStats: () => api.get<ProfitabilityStats>('/loans/profitability/stats'),
   downloadCSV: () => api.get('/loans/download/csv', { responseType: 'blob' }),
 };
 

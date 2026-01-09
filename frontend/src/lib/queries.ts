@@ -16,6 +16,10 @@ export const QUERY_KEYS = {
     overviewStats: () => ['loans', 'overview', 'stats'] as const,
     yieldStats: () => ['loans', 'yield', 'stats'] as const,
     yearlyBreakdown: () => ['loans', 'yearly', 'breakdown'] as const,
+    performanceStats: () => ['loans', 'performance', 'stats'] as const,
+    portfolioStats: () => ['loans', 'portfolio', 'stats'] as const,
+    customerAnalytics: () => ['loans', 'customer', 'analytics'] as const,
+    profitabilityStats: () => ['loans', 'profitability', 'stats'] as const,
   },
   expenses: {
     all: ['expenses'] as const,
@@ -33,6 +37,9 @@ export function useLoans(page = 1, limit = 100) {
       const response = await loanApi.getAll(page, limit);
       return response.data;
     },
+    // Increase cache time for large datasets
+    staleTime: limit > 1000 ? 10 * 60 * 1000 : 5 * 60 * 1000, // 10 min for large, 5 min for small
+    gcTime: limit > 1000 ? 20 * 60 * 1000 : 10 * 60 * 1000, // 20 min for large, 10 min for small
   });
 }
 
@@ -138,6 +145,50 @@ export function useYearlyBreakdown() {
     queryKey: QUERY_KEYS.loans.yearlyBreakdown(),
     queryFn: async () => {
       const response = await loanApi.getYearlyBreakdown();
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+export function usePerformanceStats() {
+  return useQuery({
+    queryKey: QUERY_KEYS.loans.performanceStats(),
+    queryFn: async () => {
+      const response = await loanApi.getPerformanceStats();
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+export function usePortfolioStats() {
+  return useQuery({
+    queryKey: QUERY_KEYS.loans.portfolioStats(),
+    queryFn: async () => {
+      const response = await loanApi.getPortfolioStats();
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+export function useCustomerAnalytics() {
+  return useQuery({
+    queryKey: QUERY_KEYS.loans.customerAnalytics(),
+    queryFn: async () => {
+      const response = await loanApi.getCustomerAnalytics();
+      return response.data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
+
+export function useProfitabilityStats() {
+  return useQuery({
+    queryKey: QUERY_KEYS.loans.profitabilityStats(),
+    queryFn: async () => {
+      const response = await loanApi.getProfitabilityStats();
       return response.data;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes

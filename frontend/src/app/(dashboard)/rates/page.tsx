@@ -262,17 +262,17 @@ export default function RatesPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Current Rate</span>
-                      <span className="font-bold">₹{movingAvg.current.gold.toLocaleString('en-IN')}</span>
+                      <span className="font-bold">₹{movingAvg.current?.gold?.toLocaleString('en-IN') || 'N/A'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">90-Day Average</span>
-                      <span className="font-medium">₹{movingAvg.average.gold.toLocaleString('en-IN')}</span>
+                      <span className="font-medium">₹{movingAvg.average?.gold?.toLocaleString('en-IN') || 'N/A'}</span>
                     </div>
                     <div className="flex items-center justify-between border-t pt-3">
                       <span className="text-sm font-medium">Difference</span>
-                      <span className={`font-bold ${parseFloat(movingAvg.percentChange.gold) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {parseFloat(movingAvg.percentChange.gold) >= 0 ? '+' : ''}
-                        ₹{movingAvg.difference.gold.toLocaleString('en-IN')} ({movingAvg.percentChange.gold}%)
+                      <span className={`font-bold ${parseFloat(movingAvg.percentChange?.gold || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {parseFloat(movingAvg.percentChange?.gold || '0') >= 0 ? '+' : ''}
+                        ₹{movingAvg.difference?.gold?.toLocaleString('en-IN') || 'N/A'} ({movingAvg.percentChange?.gold || '0'}%)
                       </span>
                     </div>
                   </div>
@@ -283,17 +283,17 @@ export default function RatesPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Current Rate</span>
-                      <span className="font-bold">₹{movingAvg.current.silver.toLocaleString('en-IN')}</span>
+                      <span className="font-bold">₹{movingAvg.current?.silver?.toLocaleString('en-IN') || 'N/A'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">90-Day Average</span>
-                      <span className="font-medium">₹{movingAvg.average.silver.toLocaleString('en-IN')}</span>
+                      <span className="font-medium">₹{movingAvg.average?.silver?.toLocaleString('en-IN') || 'N/A'}</span>
                     </div>
                     <div className="flex items-center justify-between border-t pt-3">
                       <span className="text-sm font-medium">Difference</span>
-                      <span className={`font-bold ${parseFloat(movingAvg.percentChange.silver) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {parseFloat(movingAvg.percentChange.silver) >= 0 ? '+' : ''}
-                        ₹{movingAvg.difference.silver.toLocaleString('en-IN')} ({movingAvg.percentChange.silver}%)
+                      <span className={`font-bold ${parseFloat(movingAvg.percentChange?.silver || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {parseFloat(movingAvg.percentChange?.silver || '0') >= 0 ? '+' : ''}
+                        ₹{movingAvg.difference?.silver?.toLocaleString('en-IN') || 'N/A'} ({movingAvg.percentChange?.silver || '0'}%)
                       </span>
                     </div>
                   </div>

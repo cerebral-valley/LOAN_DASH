@@ -7,6 +7,12 @@ import { cache } from '../utils/redisCache';
 export class LoanController {
   private loanRepository = AppDataSource.getRepository(Loan);
 
+  // Helper to check if loan is released
+  private isLoanReleased(released: string | null | undefined): boolean {
+    if (!released) return false;
+    return released.toUpperCase() === 'TRUE';
+  }
+
   getAllLoans = async (req: Request, res: Response) => {
     try {
       // Check if requesting all loans without pagination
@@ -24,7 +30,7 @@ export class LoanController {
 
       // Add pagination support with validation
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
+      const limit = Math.max(1, parseInt(req.query.limit as string) || 100);
       const skip = (page - 1) * limit;
 
       // Get total count for pagination metadata
@@ -73,12 +79,12 @@ export class LoanController {
     try {
       // Add pagination support with validation
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
+      const limit = Math.max(1, parseInt(req.query.limit as string) || 100);
       const skip = (page - 1) * limit;
 
       const queryBuilder = this.loanRepository
         .createQueryBuilder('loan')
-        .where("loan.released != 'TRUE'")
+        .where("UPPER(loan.released) != 'TRUE'")
         .orWhere('loan.released IS NULL')
         .orderBy('loan.loan_number', 'DESC')
         .skip(skip)
@@ -105,7 +111,7 @@ export class LoanController {
     try {
       // Add pagination support with validation
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
+      const limit = Math.max(1, parseInt(req.query.limit as string) || 100);
       const skip = (page - 1) * limit;
 
       const queryBuilder = this.loanRepository
@@ -137,7 +143,7 @@ export class LoanController {
       const { type } = req.params;
       // Add pagination support with validation
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
+      const limit = Math.max(1, parseInt(req.query.limit as string) || 100);
       const skip = (page - 1) * limit;
 
       const [loans, total] = await this.loanRepository.findAndCount({
@@ -285,7 +291,7 @@ export class LoanController {
       const { customerName } = req.params;
       // Add pagination support with validation
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 100));
+      const limit = Math.max(1, parseInt(req.query.limit as string) || 100);
       const skip = (page - 1) * limit;
 
       const queryBuilder = this.loanRepository
@@ -413,26 +419,427 @@ export class LoanController {
       const cachedStats = await cache.get(cacheKey);
       if (cachedStats) return res.json(cachedStats);
 
+      // Get disbursement data grouped by disbursement date
       const breakdown = await this.loanRepository
         .createQueryBuilder('loan')
         .select("YEAR(loan.date_of_disbursement)", "year")
         .addSelect("MONTH(loan.date_of_disbursement)", "month")
         .addSelect("SUM(loan.loan_amount)", "disbursedAmount")
         .addSelect("COUNT(*)", "disbursedCount")
-        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN loan.loan_amount ELSE 0 END)", "releasedAmount")
-        .addSelect("SUM(CASE WHEN UPPER(loan.released) = 'TRUE' THEN 1 ELSE 0 END)", "releasedCount")
-        .addSelect("COALESCE(SUM(loan.interest_amount), 0)", "interestReceived")
         .where("loan.date_of_disbursement >= '2020-01-01'")
         .groupBy("YEAR(loan.date_of_disbursement), MONTH(loan.date_of_disbursement)")
         .orderBy("year", "DESC")
         .addOrderBy("month", "DESC")
         .getRawMany();
 
-      await cache.set(cacheKey, breakdown);
-      res.json(breakdown);
+      // Get release data grouped by RELEASE date (when loans were actually released)
+      const releasesByReleaseDate = await this.loanRepository
+        .createQueryBuilder('loan')
+        .select("YEAR(loan.date_of_release)", "year")
+        .addSelect("MONTH(loan.date_of_release)", "month")
+        .addSelect("COALESCE(SUM(loan.loan_amount), 0)", "releasedAmount")
+        .addSelect("COUNT(*)", "releasedCount")
+        .addSelect("COALESCE(SUM(loan.interest_amount), 0)", "interestReceived")
+        .where("UPPER(loan.released) = 'TRUE'")
+        .andWhere("loan.date_of_release >= '2020-01-01'")
+        .groupBy("YEAR(loan.date_of_release), MONTH(loan.date_of_release)")
+        .getRawMany();
+
+      // Create maps for release data by year-month
+      const releaseMap = new Map<string, { releasedAmount: number; releasedCount: number; interestReceived: number }>();
+      releasesByReleaseDate.forEach(row => {
+        const key = `${row.year}-${row.month}`;
+        releaseMap.set(key, {
+          releasedAmount: parseFloat(row.releasedAmount) || 0,
+          releasedCount: parseInt(row.releasedCount) || 0,
+          interestReceived: parseFloat(row.interestReceived) || 0
+        });
+      });
+
+      // Merge release data with breakdown data (by disbursement date)
+      const result = breakdown.map(row => {
+        const key = `${row.year}-${row.month}`;
+        const releaseData = releaseMap.get(key) || { releasedAmount: 0, releasedCount: 0, interestReceived: 0 };
+        return {
+          ...row,
+          releasedAmount: releaseData.releasedAmount,
+          releasedCount: releaseData.releasedCount,
+          interestReceived: releaseData.interestReceived
+        };
+      });
+
+      await cache.set(cacheKey, result);
+      res.json(result);
     } catch (error) {
       console.error('Error fetching yearly breakdown:', error);
       res.status(500).json({ error: 'Failed to fetch yearly breakdown' });
+    }
+  };
+
+  // Performance Analytics Endpoint
+  getPerformanceStats = async (req: Request, res: Response) => {
+    try {
+      const cacheKey = 'performance_stats';
+      const cached = await cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      // Get all loans for performance calculation
+      const loans = await this.loanRepository.find();
+
+      // Calculate overall metrics
+      const totalDisbursed = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+      const releasedLoans = loans.filter(loan => this.isLoanReleased(loan.released));
+      const activeLoans = loans.filter(loan => !this.isLoanReleased(loan.released));
+
+      const totalInterestReceived = releasedLoans.reduce(
+        (sum, loan) => sum + (loan.interest_amount || 0),
+        0
+      );
+
+      const totalCollected = releasedLoans.reduce(
+        (sum, loan) => sum + (loan.loan_amount || 0),
+        0
+      );
+
+      const collectionRate = totalDisbursed > 0
+        ? (totalCollected / totalDisbursed) * 100
+        : 0;
+
+      const interestYield = totalDisbursed > 0
+        ? (totalInterestReceived / totalDisbursed) * 100
+        : 0;
+
+      const activeRate = loans.length > 0
+        ? (activeLoans.length / loans.length) * 100
+        : 0;
+
+      // Performance by customer type
+      const performanceByType: Record<string, any> = {};
+      
+      loans.forEach(loan => {
+        const type = loan.customer_type || 'Unknown';
+        if (!performanceByType[type]) {
+          performanceByType[type] = {
+            type,
+            count: 0,
+            disbursed: 0,
+            collected: 0,
+            outstanding: 0,
+            interestReceived: 0,
+            collectionRate: 0,
+            yieldRate: 0,
+          };
+        }
+
+        const loanAmount = loan.loan_amount || 0;
+        const isReleased = this.isLoanReleased(loan.released);
+
+        performanceByType[type].count++;
+        performanceByType[type].disbursed += loanAmount;
+
+        if (isReleased) {
+          performanceByType[type].collected += loanAmount;
+          performanceByType[type].interestReceived += (loan.interest_amount || 0);
+        } else {
+          performanceByType[type].outstanding += (loan.pending_loan_amount || loanAmount);
+        }
+      });
+
+      // Calculate rates for each type
+      const performanceData = Object.values(performanceByType).map((perf: any) => {
+        perf.collectionRate = perf.disbursed > 0
+          ? (perf.collected / perf.disbursed) * 100
+          : 0;
+        perf.yieldRate = perf.disbursed > 0
+          ? (perf.interestReceived / perf.disbursed) * 100
+          : 0;
+        return perf;
+      }).sort((a: any, b: any) => b.disbursed - a.disbursed);
+
+      const result = {
+        totalDisbursed,
+        totalInterestReceived,
+        collectionRate,
+        interestYield,
+        activeRate,
+        activeLoansCount: activeLoans.length,
+        releasedLoansCount: releasedLoans.length,
+        performanceData,
+      };
+
+      await cache.set(cacheKey, result, 600); // 10 min cache
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching performance stats:', error);
+      res.status(500).json({ error: 'Failed to fetch performance stats' });
+    }
+  };
+
+  // Portfolio Analytics Endpoint
+  getPortfolioStats = async (req: Request, res: Response) => {
+    try {
+      const cacheKey = 'portfolio_stats';
+      const cached = await cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const loans = await this.loanRepository.find();
+
+      // Portfolio by customer type
+      const portfolioByType: Record<string, any> = {};
+      
+      loans.forEach(loan => {
+        const type = loan.customer_type || 'Unknown';
+        const isActive = !this.isLoanReleased(loan.released);
+
+        if (!portfolioByType[type]) {
+          portfolioByType[type] = {
+            type,
+            count: 0,
+            totalAmount: 0,
+            totalOutstanding: 0,
+            activeLoans: 0,
+            releasedLoans: 0,
+            avgLoanSize: 0,
+          };
+        }
+
+        portfolioByType[type].count++;
+        portfolioByType[type].totalAmount += (loan.loan_amount || 0);
+
+        if (isActive) {
+          portfolioByType[type].activeLoans++;
+          portfolioByType[type].totalOutstanding += (loan.pending_loan_amount || loan.loan_amount || 0);
+        } else {
+          portfolioByType[type].releasedLoans++;
+        }
+      });
+
+      // Calculate averages
+      const portfolioData = Object.values(portfolioByType).map((item: any) => {
+        item.avgLoanSize = item.count > 0 ? item.totalAmount / item.count : 0;
+        return item;
+      }).sort((a: any, b: any) => b.totalAmount - a.totalAmount);
+
+      // LTV Distribution
+      const ltvDistribution: Record<string, any> = {
+        '0-50%': { range: '0-50%', count: 0, totalValue: 0 },
+        '51-70%': { range: '51-70%', count: 0, totalValue: 0 },
+        '71-80%': { range: '71-80%', count: 0, totalValue: 0 },
+        '81-90%': { range: '81-90%', count: 0, totalValue: 0 },
+        '91-100%': { range: '91-100%', count: 0, totalValue: 0 },
+      };
+
+      loans.forEach(loan => {
+        const ltv = loan.ltv_given || 0;
+        const loanAmount = loan.loan_amount || 0;
+
+        if (ltv <= 50) {
+          ltvDistribution['0-50%'].count++;
+          ltvDistribution['0-50%'].totalValue += loanAmount;
+        } else if (ltv <= 70) {
+          ltvDistribution['51-70%'].count++;
+          ltvDistribution['51-70%'].totalValue += loanAmount;
+        } else if (ltv <= 80) {
+          ltvDistribution['71-80%'].count++;
+          ltvDistribution['71-80%'].totalValue += loanAmount;
+        } else if (ltv <= 90) {
+          ltvDistribution['81-90%'].count++;
+          ltvDistribution['81-90%'].totalValue += loanAmount;
+        } else {
+          ltvDistribution['91-100%'].count++;
+          ltvDistribution['91-100%'].totalValue += loanAmount;
+        }
+      });
+
+      const result = {
+        portfolioByType: portfolioData,
+        ltvDistribution: Object.values(ltvDistribution),
+        totalLoans: loans.length,
+        activeLoans: loans.filter(l => !this.isLoanReleased(l.released)).length,
+      };
+
+      await cache.set(cacheKey, result, 600); // 10 min cache
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching portfolio stats:', error);
+      res.status(500).json({ error: 'Failed to fetch portfolio stats' });
+    }
+  };
+
+  // Customer Analytics Endpoint
+  getCustomerAnalytics = async (req: Request, res: Response) => {
+    try {
+      const cacheKey = 'customer_analytics';
+      const cached = await cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const loans = await this.loanRepository.find();
+
+      // Group by customer
+      const customerMap: Record<string, any> = {};
+
+      loans.forEach(loan => {
+        const name = loan.customer_name || 'Unknown';
+        const type = loan.customer_type || 'Unknown';
+
+        if (!customerMap[name]) {
+          customerMap[name] = {
+            name,
+            type,
+            totalLoans: 0,
+            totalDisbursed: 0,
+            totalOutstanding: 0,
+            interestReceived: 0,
+            activeLoans: 0,
+            releasedLoans: 0,
+          };
+        }
+
+        const isReleased = this.isLoanReleased(loan.released);
+        customerMap[name].totalLoans++;
+        customerMap[name].totalDisbursed += (loan.loan_amount || 0);
+
+        if (isReleased) {
+          customerMap[name].releasedLoans++;
+          customerMap[name].interestReceived += (loan.interest_amount || 0);
+        } else {
+          customerMap[name].activeLoans++;
+          customerMap[name].totalOutstanding += (loan.pending_loan_amount || loan.loan_amount || 0);
+        }
+      });
+
+      // Top customers by total disbursed
+      const topCustomers = Object.values(customerMap)
+        .sort((a: any, b: any) => b.totalDisbursed - a.totalDisbursed)
+        .slice(0, 20)
+        .map((c: any) => ({
+          ...c,
+          avgLoanSize: c.totalLoans > 0 ? c.totalDisbursed / c.totalLoans : 0,
+        }));
+
+      // Analytics by customer type
+      const byCustomerType: Record<string, any> = {};
+      
+      loans.forEach(loan => {
+        const type = loan.customer_type || 'Unknown';
+        if (!byCustomerType[type]) {
+          byCustomerType[type] = {
+            type,
+            uniqueCustomers: new Set(),
+            count: 0,
+            totalDisbursed: 0,
+          };
+        }
+
+        byCustomerType[type].uniqueCustomers.add(loan.customer_name);
+        byCustomerType[type].count++;
+        byCustomerType[type].totalDisbursed += (loan.loan_amount || 0);
+      });
+
+      const customerTypeData = Object.values(byCustomerType).map((item: any) => ({
+        type: item.type,
+        uniqueCustomers: item.uniqueCustomers.size,
+        totalLoans: item.count,
+        totalDisbursed: item.totalDisbursed,
+        avgLoansPerCustomer: item.uniqueCustomers.size > 0
+          ? item.count / item.uniqueCustomers.size
+          : 0,
+        avgDisbursement: item.count > 0
+          ? item.totalDisbursed / item.count
+          : 0,
+      }));
+
+      const result = {
+        topCustomers,
+        byCustomerType: customerTypeData,
+        totalUniqueCustomers: Object.keys(customerMap).length,
+        totalLoans: loans.length,
+      };
+
+      await cache.set(cacheKey, result, 600); // 10 min cache
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching customer analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch customer analytics' });
+    }
+  };
+
+  // Profitability Analytics Endpoint
+  getProfitabilityStats = async (req: Request, res: Response) => {
+    try {
+      const cacheKey = 'profitability_stats';
+      const cached = await cache.get(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      const loans = await this.loanRepository.find();
+      const releasedLoans = loans.filter(loan => this.isLoanReleased(loan.released));
+
+      // Overall profitability
+      const totalRevenue = releasedLoans.reduce(
+        (sum, loan) => sum + (loan.interest_amount || 0),
+        0
+      );
+
+      const totalDisbursed = releasedLoans.reduce(
+        (sum, loan) => sum + (loan.loan_amount || 0),
+        0
+      );
+
+      const avgYield = totalDisbursed > 0
+        ? (totalRevenue / totalDisbursed) * 100
+        : 0;
+
+      // Profitability by customer type
+      const profitByType: Record<string, any> = {};
+
+      releasedLoans.forEach(loan => {
+        const type = loan.customer_type || 'Unknown';
+
+        if (!profitByType[type]) {
+          profitByType[type] = {
+            type,
+            count: 0,
+            revenue: 0,
+            disbursed: 0,
+            avgYield: 0,
+          };
+        }
+
+        profitByType[type].count++;
+        profitByType[type].revenue += (loan.interest_amount || 0);
+        profitByType[type].disbursed += (loan.loan_amount || 0);
+      });
+
+      const profitabilityData = Object.values(profitByType).map((item: any) => {
+        item.avgYield = item.disbursed > 0
+          ? (item.revenue / item.disbursed) * 100
+          : 0;
+        return item;
+      }).sort((a: any, b: any) => b.revenue - a.revenue);
+
+      const result = {
+        overall: {
+          totalRevenue,
+          totalDisbursed,
+          avgYield,
+          releasedLoans: releasedLoans.length,
+        },
+        byProductType: profitabilityData,
+      };
+
+      await cache.set(cacheKey, result, 600); // 10 min cache
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching profitability stats:', error);
+      res.status(500).json({ error: 'Failed to fetch profitability stats' });
     }
   };
 }

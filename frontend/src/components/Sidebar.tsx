@@ -22,7 +22,7 @@ import {
   FileSpreadsheet,
   Calculator,
   Scale,
-} from 'lucide-react';
+} from '@/components/icons';
 
 const navigation = [
   {

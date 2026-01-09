@@ -19,6 +19,12 @@ router.get('/yield/stats', loanController.getYieldStats);
 // Get yearly breakdown
 router.get('/yearly/breakdown', loanController.getYearlyBreakdown);
 
+// Analytics endpoints (cached aggregations)
+router.get('/performance/stats', loanController.getPerformanceStats);
+router.get('/portfolio/stats', loanController.getPortfolioStats);
+router.get('/customer-analytics', loanController.getCustomerAnalytics);
+router.get('/profitability/stats', loanController.getProfitabilityStats);
+
 // Get vyapari customers
 router.get('/vyapari/customers', loanController.getVyapariCustomers);
 

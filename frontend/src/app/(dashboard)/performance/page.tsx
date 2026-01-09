@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,122 +10,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useLoans } from '@/lib/queries';
-import { isLoanReleased } from '@/lib/api';
+import { usePerformanceStats } from '@/lib/queries';
 import { Download, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
 import { exportToCSV } from '@/lib/csv-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
 
-interface PerformanceByType {
-  type: string;
-  count: number;
-  disbursed: number;
-  collected: number;
-  outstanding: number;
-  interestReceived: number;
-  collectionRate: number;
-  yieldRate: number;
-}
-
 export default function PerformancePage() {
-  const { data: loans = [], isLoading, error, refetch } = useLoans(1, 50000);
-
-  // Helper to safely get numeric value
-  const safeNumber = (value: number | undefined | null): number => {
-    if (value === null || value === undefined) return 0;
-    const num = Number(value);
-    return isNaN(num) ? 0 : num;
-  };
-
-  // Calculate performance metrics
-  const metrics = useMemo(() => {
-    const totalDisbursed = loans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
-    
-    // For released loans, pending_loan_amount should be 0 (fully paid)
-    // For active loans, pending_loan_amount is the outstanding amount
-    const releasedLoans = loans.filter((loan) => isLoanReleased(loan.released));
-    const activeLoans = loans.filter((loan) => !isLoanReleased(loan.released));
-    
-    // Use interest_amount for released loans (actual interest earned)
-    const totalInterestReceived = releasedLoans.reduce(
-      (sum, loan) => sum + safeNumber(loan.interest_amount),
-      0
-    );
-
-    // Collection Rate: How much principal has been repaid
-    // Released loans count as fully collected, active loans are outstanding
-    const totalCollected = releasedLoans.reduce((sum, loan) => sum + safeNumber(loan.loan_amount), 0);
-    const collectionRate = totalDisbursed > 0
-      ? (totalCollected / totalDisbursed) * 100
-      : 0;
-
-    // Interest Yield: Interest earned as % of disbursed amount
-    const interestYield = totalDisbursed > 0
-    ? (totalInterestReceived / totalDisbursed) * 100
-    : 0;
-
-  const activeRate = loans.length > 0 ? (activeLoans.length / loans.length) * 100 : 0;
-
-  // Performance by customer type
-  const performanceByType = loans.reduce((acc, loan) => {
-    const type = loan.customer_type || 'Unknown';
-    if (!acc[type]) {
-      acc[type] = {
-        type,
-        count: 0,
-        disbursed: 0,
-        collected: 0,
-        outstanding: 0,
-        interestReceived: 0,
-        collectionRate: 0,
-        yieldRate: 0,
-      };
-    }
-
-    const loanAmount = safeNumber(loan.loan_amount);
-    const isReleased = isLoanReleased(loan.released);
-    
-    acc[type].count++;
-    acc[type].disbursed += loanAmount;
-    
-    if (isReleased) {
-      acc[type].collected += loanAmount;
-      acc[type].interestReceived += safeNumber(loan.interest_amount);
-    } else {
-      acc[type].outstanding += safeNumber(loan.pending_loan_amount) || loanAmount;
-    }
-
-    return acc;
-  }, {} as Record<string, PerformanceByType>);
-
-  // Calculate rates for each type
-  Object.values(performanceByType).forEach((perf) => {
-    perf.collectionRate = perf.disbursed > 0
-      ? (perf.collected / perf.disbursed) * 100
-      : 0;
-    perf.yieldRate = perf.disbursed > 0
-      ? (perf.interestReceived / perf.disbursed) * 100
-      : 0;
-  });
-
-  const performanceData = Object.values(performanceByType).sort(
-    (a, b) => b.disbursed - a.disbursed
-  );
-
-  return {
-    totalDisbursed,
-    totalInterestReceived,
-    collectionRate,
-    interestYield,
-    activeRate,
-    activeLoans,
-    releasedLoans,
-    performanceData,
-  };
-}, [loans]);
+  const { data: metrics, isLoading, error, refetch } = usePerformanceStats();
 
   const handleDownloadCSV = async () => {
+    if (!metrics) return;
+    
     try {
       const csvData = metrics.performanceData.map((perf) => ({
         'Customer Type': perf.type,
@@ -150,6 +45,10 @@ export default function PerformancePage() {
 
   if (error) {
     return <ErrorState message="Failed to fetch performance data. Please ensure the backend server is running." onRetry={() => refetch()} />;
+  }
+
+  if (!metrics) {
+    return <LoadingState />;
   }
 
   return (
@@ -321,7 +220,7 @@ export default function PerformancePage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Avg Loans per Segment</span>
                 <span className="text-sm text-muted-foreground">
-                  {(loans.length / metrics.performanceData.length).toFixed(0)}
+                  {((metrics.activeLoansCount + metrics.releasedLoansCount) / metrics.performanceData.length).toFixed(0)}
                 </span>
               </div>
             </div>

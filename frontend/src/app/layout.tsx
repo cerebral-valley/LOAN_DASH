@@ -14,6 +14,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Preconnect to API server for faster requests */}
+        <link rel="preconnect" href="http://localhost:3001" />
+        <link rel="dns-prefetch" href="http://localhost:3001" />
+      </head>
       <body className="antialiased font-sans">
         <QueryProvider>{children}</QueryProvider>
       </body>

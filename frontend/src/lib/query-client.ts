@@ -16,6 +16,8 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       // Refetch on reconnect
       refetchOnReconnect: true,
+      // Don't refetch on mount if data is fresh
+      refetchOnMount: false,
     },
   },
 });
