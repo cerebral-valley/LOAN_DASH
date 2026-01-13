@@ -33,3 +33,7 @@ backend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/node_modules/
+
+# PWA - Service Worker (auto-generated)
+frontend/public/sw.js
+frontend/public/workbox-*.js

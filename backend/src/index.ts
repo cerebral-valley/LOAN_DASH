@@ -3,6 +3,9 @@ import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { initializeDatabase } from './config/database';
 import { runMigrations } from './migrations/runMigrations';
 import loanRoutes from './routes/loanRoutes';
@@ -13,18 +16,59 @@ import { etagMiddleware } from './utils/cacheMiddleware';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for API
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Rate limiting - prevent abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// Request logging (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+} else {
+  // In production, log only errors
+  app.use(morgan('combined', {
+    skip: (req, res) => res.statusCode < 400,
+  }));
+}
+
 // Middleware
 app.use(cors());
 app.use(compression()); // Enable gzip compression for responses
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Add ETag middleware for HTTP caching
 app.use(etagMiddleware);
 
-// Health check endpoint
+// Health check endpoint with detailed metrics
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const uptime = process.uptime();
+  const memoryUsage = process.memoryUsage();
+  
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: `${Math.floor(uptime / 60)} minutes`,
+    memory: {
+      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+      rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+    },
+    version: process.env.npm_package_version || '1.0.0',
+  });
 });
 
 // API Routes

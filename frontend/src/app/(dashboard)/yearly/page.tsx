@@ -16,9 +16,11 @@ export default function YearlyPage() {
   const { data: breakdown = [], isLoading, error, refetch } = useYearlyBreakdown();
 
   // Group data by year for rendering
-  const yearsData = breakdown.reduce((acc: any, curr: any) => {
-    if (!acc[curr.year]) acc[curr.year] = {};
-    acc[curr.year][MONTHS[curr.month - 1]] = curr;
+  const yearsData = breakdown.reduce((acc: Record<string, Record<string, Record<string, unknown>>>, curr: Record<string, unknown>) => {
+    const year = String(curr.year);
+    const month = Number(curr.month);
+    if (!acc[year]) acc[year] = {};
+    acc[year][MONTHS[month - 1]] = curr;
     return acc;
   }, {});
 
@@ -26,7 +28,8 @@ export default function YearlyPage() {
 
   const calculateYearTotal = (year: string, field: string) => {
     return MONTHS.reduce((sum, month) => {
-      return sum + (parseFloat(yearsData[year][month]?.[field]) || 0);
+      const value = yearsData[year][month]?.[field];
+      return sum + (parseFloat(String(value)) || 0);
     }, 0);
   };
 
@@ -34,8 +37,8 @@ export default function YearlyPage() {
     const currentYear = parseInt(year);
     const prevYear = (currentYear - 1).toString();
     
-    const currentVal = parseFloat(yearsData[year][month]?.[field]) || 0;
-    const prevVal = parseFloat(yearsData[prevYear]?.[month]?.[field]) || 0;
+    const currentVal = parseFloat(String(yearsData[year][month]?.[field])) || 0;
+    const prevVal = parseFloat(String(yearsData[prevYear]?.[month]?.[field])) || 0;
 
     // Don't show YoY if both current and previous values are 0
     if (currentVal === 0 && prevVal === 0) return null;
@@ -98,7 +101,7 @@ export default function YearlyPage() {
                           <TableCell key={month} className="text-right">
                             <div>
                               {yearsData[year][month]
-                                ? `₹${Math.round(parseFloat(yearsData[year][month].disbursedAmount)).toLocaleString('en-IN')}`
+                                ? `₹${Math.round(parseFloat(String(yearsData[year][month]?.disbursedAmount))).toLocaleString('en-IN')}`
                                 : '-'}
                             </div>
                             {yoy && (
@@ -150,7 +153,7 @@ export default function YearlyPage() {
                           <TableCell key={month} className="text-right">
                             <div>
                               {yearsData[year][month]
-                                ? `₹${Math.round(parseFloat(yearsData[year][month].interestReceived)).toLocaleString('en-IN')}`
+                                ? `₹${Math.round(parseFloat(String(yearsData[year][month]?.interestReceived))).toLocaleString('en-IN')}`
                                 : '-'}
                             </div>
                             {yoy && (
@@ -202,7 +205,7 @@ export default function YearlyPage() {
                           <TableCell key={month} className="text-right">
                             <div>
                               {yearsData[year][month]
-                                ? Math.round(parseFloat(yearsData[year][month].disbursedCount)).toLocaleString('en-IN')
+                                ? Math.round(parseFloat(String(yearsData[year][month]?.disbursedCount))).toLocaleString('en-IN')
                                 : '-'}
                             </div>
                             {yoy && (

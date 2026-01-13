@@ -10,16 +10,21 @@ import { formatCurrency, formatPercentage } from '@/lib/formatting-utils';
 import { calculateCollectionRate, calculateInterestToPrincipalRatio } from '@/lib/aggregation-utils';
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
+import { Breadcrumb } from '@/components/Breadcrumb';
+import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const { data: stats, isLoading: loading, error, refetch: fetchStats } = useLoanStats();
 
   const handleDownloadCSV = async () => {
     try {
+      toast.loading('Preparing CSV download...');
       const response = await loanApi.downloadCSV();
       downloadCSV(response.data, 'loans.csv');
+      toast.success('CSV downloaded successfully!');
     } catch (err) {
       console.error('Error downloading CSV:', err);
+      toast.error('Failed to download CSV. Please try again.');
     }
   };
 
@@ -49,6 +54,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8">
+      <Breadcrumb />
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold">Executive Dashboard</h1>
