@@ -23,6 +23,7 @@ import {
   Calculator,
   Scale,
 } from '@/components/icons';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navigation = [
   {
@@ -188,6 +189,10 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Theme</span>
+          <ThemeToggle />
+        </div>
         <p className="text-xs text-muted-foreground">
           © 2026 City Central Web App
         </p>
