@@ -274,6 +274,15 @@ export interface ExpenseStats {
   bankExpenses: number;
 }
 
+// Add missing type definitions
+export interface YieldStats {
+  [key: string]: unknown;
+}
+
+export interface YearlyBreakdown {
+  [key: string]: unknown;
+}
+
 // API response types
 interface PaginatedResponse<T> {
   data?: T[];
@@ -332,8 +341,8 @@ export const loanApi = {
   },
   getStats: () => api.get<LoanStats>('/loans/stats'),
   getOverviewStats: () => api.get<OverviewStats>('/loans/overview/stats'),
-  getYieldStats: () => api.get<any>('/loans/yield/stats'),
-  getYearlyBreakdown: () => api.get<any[]>('/loans/yearly/breakdown'),
+  getYieldStats: () => api.get<YieldStats>('/loans/yield/stats'),
+  getYearlyBreakdown: () => api.get<YearlyBreakdown[]>('/loans/yearly/breakdown'),
   getPerformanceStats: () => api.get<PerformanceStats>('/loans/performance/stats'),
   getPortfolioStats: () => api.get<PortfolioStats>('/loans/portfolio/stats'),
   getCustomerAnalytics: () => api.get<CustomerAnalytics>('/loans/customer-analytics'),

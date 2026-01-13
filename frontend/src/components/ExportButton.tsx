@@ -13,7 +13,7 @@ import { exportToCSV, exportToJSON, exportToExcel, printData } from '@/lib/expor
 import { toast } from 'sonner';
 
 interface ExportButtonProps {
-  data: any[];
+  data: Record<string, unknown>[];
   filename?: string;
   title?: string;
 }

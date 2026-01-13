@@ -31,6 +31,8 @@ import {
   Filter,
   AlertCircle,
   Clock,
+  Menu,
+  X,
 } from 'lucide-react';
 
 // Export all icons used across the application
@@ -63,4 +65,6 @@ export {
   Filter,
   AlertCircle,
   Clock,
+  Menu,
+  X,
 };

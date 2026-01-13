@@ -1,6 +1,7 @@
-import { formatCurrency, formatDate } from './formatting-utils';
+// Remove unused imports
+// import { formatCurrency, formatDate } from './formatting-utils';
 
-export function exportToCSV(data: any[], filename: string = 'export.csv') {
+export function exportToCSV(data: Record<string, unknown>[], filename: string = 'export.csv') {
   if (!data || data.length === 0) {
     console.error('No data to export');
     return;
@@ -31,7 +32,7 @@ export function exportToCSV(data: any[], filename: string = 'export.csv') {
   URL.revokeObjectURL(link.href);
 }
 
-export function exportToJSON(data: any[], filename: string = 'export.json') {
+export function exportToJSON(data: Record<string, unknown>[], filename: string = 'export.json') {
   if (!data || data.length === 0) {
     console.error('No data to export');
     return;
@@ -46,7 +47,7 @@ export function exportToJSON(data: any[], filename: string = 'export.json') {
   URL.revokeObjectURL(link.href);
 }
 
-export function exportToExcel(data: any[], filename: string = 'export.xlsx') {
+export function exportToExcel(data: Record<string, unknown>[], filename: string = 'export.xlsx') {
   // Simple Excel export using HTML table format that Excel can read
   if (!data || data.length === 0) {
     console.error('No data to export');
@@ -92,7 +93,7 @@ export function exportToExcel(data: any[], filename: string = 'export.xlsx') {
   URL.revokeObjectURL(link.href);
 }
 
-export function printData(data: any[], title: string = 'Report') {
+export function printData(data: Record<string, unknown>[], title: string = 'Report') {
   if (!data || data.length === 0) {
     console.error('No data to print');
     return;
